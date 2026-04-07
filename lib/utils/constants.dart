@@ -14,11 +14,11 @@ class AppConstants {
 
   // Durées seuils (en mois) - MISE À JOUR
   static const int dureeMin = 1;
-  static const int dureeMax = 12; // Maximum 12 mois
+  static const int dureeMax = 6; // Maximum 6 mois
   static const int dureeTaux1 = 1; // 1 mois (remboursement en une fois)
   static const int dureeTaux2a4 = 4; // 2 à 4 mois
-  static const int dureeTaux5a8 = 8; // 5 à 8 mois
-  // 9+ mois utilisent tauxDuree9Plus
+  static const int dureeTaux5a8 = 6; // 5 à 6 mois (max)
+  // N/A: 7+ mois désormais hors plafond
 
   // Règles de dates de remboursement
   static const int jourLimiteDebutMois = 10; // Si emprunt entre 1-10

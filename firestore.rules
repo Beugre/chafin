@@ -1,10 +1,73 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // RÈGLES TEMPORAIRES POUR DÉVELOPPEMENT - À SÉCURISER EN PRODUCTION
-    // Permettre toutes les opérations pour résoudre les problèmes d'accès
-    match /{document=**} {
-      allow read, write: if true;
+
+    // Fonctions utilitaires
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superAdmin'];
+    }
+
+    // ── Collection : users ─────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Collection : loans ─────────────────────────────────────────
+    match /loans/{loanId} {
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && resource.data.userId == request.auth.uid
+          && resource.data.statut in ['brouillon', 'soumis']);
+      allow delete: if isAdmin();
+    }
+
+    // ── Collection : schedules ─────────────────────────────────────
+    match /schedules/{scheduleId} {
+      allow read: if isAuthenticated()
+        && (
+          isAdmin()
+          || (exists(/databases/$(database)/documents/loans/$(resource.data.loanId))
+            && get(/databases/$(database)/documents/loans/$(resource.data.loanId)).data.userId == request.auth.uid)
+        );
+      allow write: if isAdmin();
+    }
+
+    // ── Collection : notifications ─────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    // ── Collection : repayments ────────────────────────────────────
+    match /repayments/{repaymentId} {
+      allow read: if isAuthenticated()
+        && (
+          isAdmin()
+          || (exists(/databases/$(database)/documents/loans/$(resource.data.loanId))
+            && get(/databases/$(database)/documents/loans/$(resource.data.loanId)).data.userId == request.auth.uid)
+        );
+      allow write: if isAdmin();
     }
 
   }

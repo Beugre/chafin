@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/loan_provider.dart';
+import '../../config/app_theme.dart';
 import 'borrower_dashboard_screen.dart';
 import 'my_loans_screen.dart';
 import 'profile_screen.dart';
@@ -72,9 +73,9 @@ class _MainAppScreenState extends State<MainAppScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 16,
+              offset: const Offset(0, -2),
             ),
           ],
         ),
@@ -151,13 +152,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [Color(0xFF00D4FF), Color(0xFF3B82F6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
+          gradient: isSelected ? AppTheme.primaryGradient : null,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -165,14 +160,14 @@ class _MainAppScreenState extends State<MainAppScreen> {
           children: [
             Icon(
               isSelected ? icon : inactiveIcon,
-              color: isSelected ? Colors.white : Colors.grey[600],
+              color: isSelected ? Colors.white : AppTheme.textSecondaryColor,
               size: 24,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey[600],
+                color: isSelected ? Colors.white : AppTheme.textSecondaryColor,
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),

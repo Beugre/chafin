@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/loan_provider.dart';
 import '../../models/loan_model.dart';
+import '../../config/app_theme.dart';
 
 class MyLoansScreen extends StatefulWidget {
   const MyLoansScreen({super.key});
@@ -32,7 +33,7 @@ class _MyLoansScreenState extends State<MyLoansScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -48,18 +49,15 @@ class _MyLoansScreenState extends State<MyLoansScreen>
                       const Text(
                         'Mes Prêts',
                         style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimaryColor,
+                          letterSpacing: -0.5,
                         ),
                       ),
                       Container(
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF00D4FF), Color(0xFF3B82F6)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          gradient: AppTheme.primaryGradient,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Material(
@@ -121,14 +119,10 @@ class _MyLoansScreenState extends State<MyLoansScreen>
                 controller: _tabController,
                 indicator: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF00D4FF), Color(0xFF3B82F6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: AppTheme.primaryGradient,
                 ),
                 labelColor: Colors.white,
-                unselectedLabelColor: Colors.grey[600],
+                unselectedLabelColor: AppTheme.textSecondaryColor,
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -284,7 +278,11 @@ class _MyLoansScreenState extends State<MyLoansScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      NumberFormat.currency(locale: 'fr_FR', symbol: '€', decimalDigits: 0).format(loan.montant),
+                      NumberFormat.currency(
+                        locale: 'fr_FR',
+                        symbol: '€',
+                        decimalDigits: 0,
+                      ).format(loan.montant),
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,

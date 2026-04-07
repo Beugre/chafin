@@ -1663,6 +1663,15 @@ class _LoanDetailsScreenState extends State<LoanDetailsScreen>
                   Icons.schedule,
                   Colors.teal,
                 ),
+                if (loan!.ribEmprunteur.isNotEmpty) ...[
+                  const Divider(height: 32),
+                  _buildModernInfoRow(
+                    'RIB / IBAN',
+                    loan!.ribEmprunteur,
+                    Icons.account_balance,
+                    Colors.indigo,
+                  ),
+                ],
               ],
             ),
           ),

@@ -60,7 +60,7 @@ class AppEnvironment {
         return const AppLimits(
           maxLoanAmount: 50000.0,
           minLoanAmount: 10.0,
-          maxLoanDuration: 60,
+          maxLoanDuration: 6,
           minLoanDuration: 1,
           maxFileSize: 10 * 1024 * 1024, // 10 MB
         );
@@ -69,7 +69,7 @@ class AppEnvironment {
         return const AppLimits(
           maxLoanAmount: 100000.0,
           minLoanAmount: 1.0,
-          maxLoanDuration: 120,
+          maxLoanDuration: 6,
           minLoanDuration: 1,
           maxFileSize: 50 * 1024 * 1024, // 50 MB pour les tests
         );

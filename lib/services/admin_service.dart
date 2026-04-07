@@ -69,16 +69,17 @@ class AdminService {
     try {
       print('=== AdminService.getAllLoans ===');
 
-      final QuerySnapshot snapshot = await _firestore.collection('loans').get();
+      final QuerySnapshot snapshot = await _firestore
+          .collection('loans')
+          .orderBy('createdAt', descending: true)
+          .limit(100)
+          .get();
 
       final loans = snapshot.docs
           .map((doc) => LoanModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
       print('Total prêts récupérés: ${loans.length}');
-
-      // Trier par date de création (plus récent en premier)
-      loans.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       return loans;
     } catch (e) {

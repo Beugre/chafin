@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../models/loan_model.dart';
 import '../models/schedule_item_model.dart';
 import '../models/notification_model.dart';
+import '../utils/constants.dart';
 import 'loan_calculation_service.dart';
 import 'app_notification_service.dart';
 import 'email_service.dart';
@@ -358,6 +359,7 @@ class LoanService {
       final QuerySnapshot snapshot = await _firestore
           .collection('loans')
           .where('userId', isEqualTo: userId)
+          .limit(AppConstants.paginationLimit)
           .get();
 
       print(
@@ -391,6 +393,7 @@ class LoanService {
 
       final QuerySnapshot snapshot = await query
           .orderBy('createdAt', descending: true)
+          .limit(100)
           .get();
 
       return snapshot.docs

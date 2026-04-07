@@ -380,8 +380,8 @@ class _LoanRequestScreenState extends State<LoanRequestScreen> {
                         onChanged: (_) => _updateCalculations(),
                         validator: (value) {
                           final duree = int.tryParse(value ?? '');
-                          if (duree == null || duree < 1 || duree > 60) {
-                            return 'Durée entre 1 et 60 mois';
+                          if (duree == null || duree < 1 || duree > 6) {
+                            return 'Durée entre 1 et 6 mois';
                           }
                           return null;
                         },
