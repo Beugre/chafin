@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // RÈGLES TEMPORAIRES POUR DEBUG - SEULEMENT EN DÉVELOPPEMENT
+    // ⚠️ REMPLACER PAR DES RÈGLES SÉCURISÉES EN PRODUCTION ⚠️
+    
+    // Permettre toutes les opérations en lecture/écriture (TEMPORAIRE)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

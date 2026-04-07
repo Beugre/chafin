@@ -1,0 +1,108 @@
+{
+    "projects": {
+        "default": "chafin-23cad"
+    },
+    "firestore": {
+        "rules": "firestore.rules",
+        "indexes": "firestore.indexes.json"
+    },
+    "hosting": {
+        "site": "chafin",
+        "public": "build/web",
+        "ignore": [
+            "firebase.json",
+            "**/.*",
+            "**/node_modules/**"
+        ],
+        "headers": [
+            {
+                "source": "flutter_service_worker.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "no-cache, no-store, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "flutter_bootstrap.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "no-cache, no-store, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "main.dart.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "no-cache, no-store, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "index.html",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "no-cache, no-store, must-revalidate"
+                    }
+                ]
+            }
+        ],
+        "rewrites": [
+            {
+                "source": "**",
+                "destination": "/index.html"
+            }
+        ]
+    },
+    "functions": {
+        "source": "functions",
+        "runtime": "nodejs20"
+    },
+    "storage": {
+        "rules": "storage.rules"
+    },
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "chafin-23cad",
+                    "appId": "1:314923488171:android:5c7c7eea378b91a3caf8ee",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "ios": {
+                "default": {
+                    "projectId": "chafin-23cad",
+                    "appId": "1:314923488171:ios:e0bec6cefaee3d32caf8ee",
+                    "uploadDebugSymbols": false,
+                    "fileOutput": "ios/Runner/GoogleService-Info.plist"
+                }
+            },
+            "macos": {
+                "default": {
+                    "projectId": "chafin-23cad",
+                    "appId": "1:314923488171:ios:e0bec6cefaee3d32caf8ee",
+                    "uploadDebugSymbols": false,
+                    "fileOutput": "macos/Runner/GoogleService-Info.plist"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "chafin-23cad",
+                    "configurations": {
+                        "android": "1:314923488171:android:5c7c7eea378b91a3caf8ee",
+                        "ios": "1:314923488171:ios:e0bec6cefaee3d32caf8ee",
+                        "macos": "1:314923488171:ios:e0bec6cefaee3d32caf8ee",
+                        "web": "1:314923488171:web:a1d494c389c229d8caf8ee",
+                        "windows": "1:314923488171:web:bb0edf64e504c6c2caf8ee"
+                    }
+                }
+            }
+        }
+    }
+}

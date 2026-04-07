@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "314923488171",
+    "firebase_url": "https://chafin-23cad-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "chafin-23cad",
+    "storage_bucket": "chafin-23cad.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:314923488171:android:5c7c7eea378b91a3caf8ee",
+        "android_client_info": {
+          "package_name": "com.chafin.chafin_loans"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv5jww8KkcBDZaBpov_g_tpohAc2A-n28"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
