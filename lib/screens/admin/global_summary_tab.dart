@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../../providers/admin_provider.dart';
 import '../../services/payment_reminder_service.dart';
 
 /// Onglet Résumé Global — tableau de bord des prêts actifs et fermés
@@ -33,45 +34,37 @@ class _GlobalSummaryTabState extends State<GlobalSummaryTab> {
     setState(() => _isLoading = true);
 
     try {
-      final firestore = FirebaseFirestore.instance;
+      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
 
-      // ⚡ 3 requêtes BULK au lieu de N requêtes séquentielles
-      final results = await Future.wait([
-        firestore.collection('loans').get(),
-        firestore.collection('users').get(),
-        firestore.collection('schedules').get(),
-      ]);
-
-      final loansSnap = results[0];
-      final usersSnap = results[1];
-      final schedulesSnap = results[2];
-
-      // Indexer les utilisateurs par ID
-      final Map<String, Map<String, dynamic>> usersById = {};
-      for (final doc in usersSnap.docs) {
-        usersById[doc.id] = doc.data() as Map<String, dynamic>;
+      // Use data already loaded by AdminProvider instead of 3 separate Firestore queries
+      if (adminProvider.allLoans.isEmpty) {
+        await adminProvider.loadAllAdminData();
       }
 
-      // Indexer les échéances par loanId
-      final Map<String, List<Map<String, dynamic>>> schedulesByLoan = {};
-      for (final doc in schedulesSnap.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final loanId = data['loanId'] as String?;
-        if (loanId != null) {
-          schedulesByLoan.putIfAbsent(loanId, () => []);
-          schedulesByLoan[loanId]!.add(data);
-        }
+      final allLoans = adminProvider.allLoans;
+      final allUsers = adminProvider.allUsers;
+      final allSchedules = adminProvider.allSchedules;
+
+      // Index users by ID
+      final Map<String, String> userNameById = {};
+      for (final user in allUsers) {
+        userNameById[user.id] = user.nom;
+      }
+
+      // Index schedules by loanId
+      final Map<String, List<dynamic>> schedulesByLoan = {};
+      for (final schedule in allSchedules) {
+        schedulesByLoan.putIfAbsent(schedule.loanId, () => []);
+        schedulesByLoan[schedule.loanId]!.add(schedule);
       }
 
       final List<_LoanSummary> summaries = [];
       final now = DateTime.now();
 
-      for (final loanDoc in loansSnap.docs) {
-        final loan = loanDoc.data() as Map<String, dynamic>;
-        final loanId = loanDoc.id;
-        final statut = loan['statut'] as String? ?? '';
+      for (final loan in allLoans) {
+        final statut = loan.statut.name;
 
-        // Ignorer les prêts annulés, refusés et brouillons
+        // Ignore cancelled, refused, draft, submitted, review loans
         if ([
           'annule',
           'refuse',
@@ -82,80 +75,63 @@ class _GlobalSummaryTabState extends State<GlobalSummaryTab> {
           continue;
         }
 
-        // Récupérer le nom depuis le cache mémoire
-        String borrowerName = 'Inconnu';
-        final userId = (loan['emprunteurId'] ?? loan['userId'] ?? '') as String;
-        if (userId.isNotEmpty && usersById.containsKey(userId)) {
-          final userData = usersById[userId]!;
-          borrowerName =
-              userData['nom'] as String? ??
-              userData['displayName'] as String? ??
-              'Inconnu';
-        }
+        // Get borrower name
+        String borrowerName = loan.nomEmprunteur.isNotEmpty
+            ? loan.nomEmprunteur
+            : (userNameById[loan.userId] ?? 'Inconnu');
 
-        // Récupérer les échéances depuis le cache mémoire
-        final echeances = schedulesByLoan[loanId] ?? [];
-        // Trier par numéro
-        echeances.sort(
-          (a, b) => ((a['numero'] as int?) ?? 0).compareTo(
-            (b['numero'] as int?) ?? 0,
-          ),
-        );
+        // Get schedules for this loan
+        final echeances = (schedulesByLoan[loan.id] ?? []);
+        // Sort by number
+        echeances.sort((a, b) => a.numero.compareTo(b.numero));
 
         final totalEcheances = echeances.length;
-        final payees = echeances.where((e) => e['isPaid'] == true).toList();
-        final impayees = echeances.where((e) => e['isPaid'] != true).toList();
+        final payees = echeances.where((e) => e.isPaid).toList();
+        final impayees = echeances.where((e) => !e.isPaid).toList();
 
-        // Calculs des montants
+        // Calculate amounts
         double montantRembourse = 0;
         double interetsPaies = 0;
         double montantTotalDu = 0;
         double interetsTotaux = 0;
 
         for (final e in echeances) {
-          montantTotalDu += (e['total'] as num?)?.toDouble() ?? 0;
-          interetsTotaux += (e['interet'] as num?)?.toDouble() ?? 0;
+          montantTotalDu += e.total;
+          interetsTotaux += e.interet;
         }
 
         for (final e in payees) {
-          montantRembourse += (e['total'] as num?)?.toDouble() ?? 0;
-          interetsPaies += (e['interet'] as num?)?.toDouble() ?? 0;
+          montantRembourse += e.total;
+          interetsPaies += e.interet;
         }
 
-        // Échéances en retard
-        final enRetard = impayees.where((e) {
-          final dueDate = (e['dueDate'] as Timestamp?)?.toDate();
-          return dueDate != null && dueDate.isBefore(now);
-        }).toList();
+        // Overdue schedules
+        final enRetard = impayees
+            .where((e) => e.dueDate.isBefore(now))
+            .toList();
 
         int maxJoursRetard = 0;
         for (final e in enRetard) {
-          final dueDate = (e['dueDate'] as Timestamp?)?.toDate();
-          if (dueDate != null) {
-            final jours = now.difference(dueDate).inDays;
-            if (jours > maxJoursRetard) maxJoursRetard = jours;
-          }
+          final jours = now.difference(e.dueDate).inDays;
+          if (jours > maxJoursRetard) maxJoursRetard = jours;
         }
 
-        // Prochaine échéance impayée future
+        // Next unpaid future schedule
         DateTime? prochaineDate;
         int? prochaineNumero;
         for (final e in impayees) {
-          final dueDate = (e['dueDate'] as Timestamp?)?.toDate();
-          if (dueDate != null && !dueDate.isBefore(now)) {
-            prochaineDate = dueDate;
-            prochaineNumero = e['numero'] as int?;
+          if (!e.dueDate.isBefore(now)) {
+            prochaineDate = e.dueDate;
+            prochaineNumero = e.numero;
             break;
           }
         }
 
-        final montant = (loan['montant'] as num?)?.toDouble() ?? 0;
-
         summaries.add(
           _LoanSummary(
-            loanId: loanId,
+            loanId: loan.id,
             borrowerName: borrowerName,
-            montant: montant,
+            montant: loan.montant,
             statut: statut,
             totalEcheances: totalEcheances,
             echeancesPayees: payees.length,
@@ -171,7 +147,7 @@ class _GlobalSummaryTabState extends State<GlobalSummaryTab> {
         );
       }
 
-      // Tri : en retard d'abord (par jours décroissants), puis à jour, puis fermés
+      // Sort: overdue first (by days desc), then current, then closed
       summaries.sort((a, b) {
         if (a.statut == 'ferme' && b.statut != 'ferme') return 1;
         if (a.statut != 'ferme' && b.statut == 'ferme') return -1;

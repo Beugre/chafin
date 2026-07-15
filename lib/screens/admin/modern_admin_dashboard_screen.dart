@@ -7,6 +7,8 @@ import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/loan_model.dart';
 import '../../models/user_model.dart';
+import '../../services/chat_service.dart';
+import '../../services/csv_export_service.dart';
 import 'global_summary_tab.dart';
 
 class ModernAdminDashboardScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
     symbol: '€',
     decimalDigits: 0,
   );
+  String _chartPeriod = '6m'; // '3m', '6m', '1a', 'tout'
 
   @override
   void initState() {
@@ -89,6 +92,52 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
         ),
       ),
       actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: StreamBuilder<int>(
+            stream: ChatService().getTotalUnreadForAdmin(),
+            builder: (context, snapshot) {
+              final unread = snapshot.data ?? 0;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.chat_bubble_outline,
+                      color: Colors.white,
+                    ),
+                    onPressed: () => context.push('/admin/chat'),
+                    tooltip: 'Messagerie',
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF3B30),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
         Container(
           margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
@@ -202,11 +251,29 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
             const SizedBox(height: 24),
 
             // Évolution des prêts dans le temps
+            _buildPeriodSelector(),
+            const SizedBox(height: 12),
             _buildLoanTrendChart(adminProvider),
             const SizedBox(height: 24),
 
-            // 📊 KPIs Avancés
+            // 💹 Courbe PnL mensuelle
+            _buildPnLChart(adminProvider),
+            const SizedBox(height: 24),
+
+            // � Tableau de recouvrement
+            _buildRecoveryTable(adminProvider),
+            const SizedBox(height: 24),
+
+            // �📊 KPIs Avancés
             _buildAdvancedKPIs(adminProvider),
+            const SizedBox(height: 24),
+
+            // 🤝 Section Parrainages
+            _buildReferralSection(adminProvider),
+            const SizedBox(height: 24),
+
+            // 📥 Export CSV
+            _buildExportSection(adminProvider),
             const SizedBox(height: 24),
 
             // Actions rapides
@@ -286,7 +353,256 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
     );
   }
 
-  // 📊 Section des KPIs avancés
+  // � Tableau de recouvrement — prêts en retard groupés par ancienneté
+  Widget _buildRecoveryTable(AdminProvider adminProvider) {
+    final now = DateTime.now();
+    final overdueLoans = adminProvider.allLoans
+        .where((l) => l.statut == LoanStatus.enRetard)
+        .toList();
+
+    // Calculer les jours de retard pour chaque prêt (basé sur la plus ancienne échéance impayée)
+    final rows = <Map<String, dynamic>>[];
+    for (final loan in overdueLoans) {
+      final schedules =
+          adminProvider.allSchedules
+              .where(
+                (s) =>
+                    s.loanId == loan.id && !s.isPaid && s.dueDate.isBefore(now),
+              )
+              .toList()
+            ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+      if (schedules.isEmpty) continue;
+      final oldestDue = schedules.first.dueDate;
+      final daysLate = now.difference(oldestDue).inDays;
+      final unpaidTotal = schedules.fold<double>(0, (s, e) => s + e.total);
+      // Find borrower name
+      final user = adminProvider.allUsers.firstWhere(
+        (u) => u.id == loan.userId,
+        orElse: () => adminProvider.allUsers.first,
+      );
+      rows.add({
+        'loan': loan,
+        'daysLate': daysLate,
+        'unpaidTotal': unpaidTotal,
+        'unpaidCount': schedules.length,
+        'borrowerName': loan.nomEmprunteur.isNotEmpty
+            ? loan.nomEmprunteur
+            : user.nom,
+      });
+    }
+    rows.sort((a, b) => (b['daysLate'] as int).compareTo(a['daysLate'] as int));
+
+    // Grouper par tranche
+    final under30 = rows.where((r) => (r['daysLate'] as int) < 30).toList();
+    final d30to60 = rows
+        .where(
+          (r) => (r['daysLate'] as int) >= 30 && (r['daysLate'] as int) < 60,
+        )
+        .toList();
+    final d60to90 = rows
+        .where(
+          (r) => (r['daysLate'] as int) >= 60 && (r['daysLate'] as int) < 90,
+        )
+        .toList();
+    final over90 = rows.where((r) => (r['daysLate'] as int) >= 90).toList();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tableau de recouvrement',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${overdueLoans.length} prêt(s) en retard',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Summary chips
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildRecoveryChip(
+                    '<30j',
+                    under30.length,
+                    const Color(0xFFF59E0B),
+                  ),
+                  _buildRecoveryChip(
+                    '30-60j',
+                    d30to60.length,
+                    const Color(0xFFF97316),
+                  ),
+                  _buildRecoveryChip(
+                    '60-90j',
+                    d60to90.length,
+                    const Color(0xFFEF4444),
+                  ),
+                  _buildRecoveryChip(
+                    '90j+',
+                    over90.length,
+                    const Color(0xFFDC2626),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (rows.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Aucun prêt en retard 🎉',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...rows.map((r) {
+                  final daysLate = r['daysLate'] as int;
+                  final color = daysLate >= 90
+                      ? const Color(0xFFDC2626)
+                      : daysLate >= 60
+                      ? const Color(0xFFEF4444)
+                      : daysLate >= 30
+                      ? const Color(0xFFF97316)
+                      : const Color(0xFFF59E0B);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: color.withOpacity(0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${daysLate}j',
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                r['borrowerName'] as String,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_currencyFormat.format((r['loan'] as dynamic).montant)} — ${r['unpaidCount']} éch. impayée(s)',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          _currencyFormat.format(r['unpaidTotal']),
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecoveryChip(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        '$label : $count',
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  // �📊 Section des KPIs avancés
   Widget _buildAdvancedKPIs(AdminProvider adminProvider) {
     final stats = _calculateStats(adminProvider);
 
@@ -355,13 +671,23 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
                   color: const Color(0xFF3B82F6),
                 ),
 
+                // Taux de rejet
+                _buildAdvancedKPICard(
+                  title: 'Taux de rejet',
+                  mainValue:
+                      '${(stats['tauxRejet'] as double).toStringAsFixed(1)}%',
+                  subtitle: '${stats['rejectedLoans']} prêts refusés',
+                  icon: Icons.block,
+                  color: const Color(0xFFFF6B6B),
+                ),
+
                 // Taux de défaut
                 _buildAdvancedKPICard(
                   title: 'Taux de défaut',
                   mainValue:
                       '${(stats['tauxDefaut'] as double).toStringAsFixed(1)}%',
-                  subtitle: 'Prêts refusés',
-                  icon: Icons.trending_down,
+                  subtitle: '${stats['lateLoans']} prêts en retard',
+                  icon: Icons.warning_amber,
                   color: const Color(0xFFEF4444),
                 ),
 
@@ -576,21 +902,21 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
               value: stats['activeLoans'].toString(),
               icon: Icons.trending_up,
               color: const Color(0xFF10B981),
-              trend: '+12%',
+              trend: '${stats['lateLoans']} en retard',
             ),
             _buildModernStatCard(
               title: 'En attente',
               value: stats['pendingLoans'].toString(),
               icon: Icons.hourglass_empty,
               color: const Color(0xFFF59E0B),
-              trend: '-5%',
+              trend: '',
             ),
             _buildModernStatCard(
               title: 'Utilisateurs',
               value: stats['totalUsers'].toString(),
               icon: Icons.people,
               color: const Color(0xFF00D4FF),
-              trend: '+8%',
+              trend: '${stats['newUsersThisMonth']} ce mois',
             ),
             // 💰 NOUVELLES CARTES FINANCIÈRES
             _buildModernStatCard(
@@ -918,7 +1244,59 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
     );
   }
 
+  Widget _buildPeriodSelector() {
+    const periods = {
+      '3m': '3 mois',
+      '6m': '6 mois',
+      '1a': '1 an',
+      'tout': 'Tout',
+    };
+    return Row(
+      children: [
+        Icon(Icons.date_range, color: Colors.white.withOpacity(0.5), size: 18),
+        const SizedBox(width: 8),
+        Text(
+          'Période :',
+          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+        ),
+        const SizedBox(width: 8),
+        ...periods.entries.map((e) {
+          final selected = _chartPeriod == e.key;
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: ChoiceChip(
+              label: Text(
+                e.value,
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.6),
+                  fontSize: 12,
+                ),
+              ),
+              selected: selected,
+              selectedColor: const Color(0xFF3B82F6),
+              backgroundColor: const Color(0xFF1E293B),
+              side: BorderSide(color: Colors.white.withOpacity(0.15)),
+              onSelected: (_) => setState(() => _chartPeriod = e.key),
+              visualDensity: VisualDensity.compact,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildLoanTrendChart(AdminProvider adminProvider) {
+    final trendData = _generateTrendData(adminProvider);
+    final months = _chartPeriodMonths;
+    final maxY = trendData.isEmpty
+        ? 50000.0
+        : (trendData.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.3)
+              .clamp(1000.0, double.infinity);
+    // Show every N labels to avoid overlap
+    final labelInterval = months <= 6 ? 1 : (months <= 12 ? 2 : 3);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isMobile = constraints.maxWidth < 600;
@@ -949,7 +1327,10 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: false,
-                      horizontalInterval: 10000,
+                      horizontalInterval: (maxY / 4).ceilToDouble().clamp(
+                        1000,
+                        double.infinity,
+                      ),
                       getDrawingHorizontalLine: (value) {
                         return FlLine(
                           color: Colors.white.withOpacity(0.1),
@@ -968,31 +1349,36 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
+                          interval: 1,
                           getTitlesWidget: (double value, TitleMeta meta) {
-                            const months = [
-                              'Jan',
-                              'Fév',
-                              'Mar',
-                              'Avr',
-                              'Mai',
-                              'Jun',
-                            ];
-                            if (value.toInt() < months.length) {
-                              return Text(
-                                months[value.toInt()],
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6),
-                                  fontSize: 12,
+                            final now = DateTime.now();
+                            final idx = value.toInt();
+                            if (idx >= 0 &&
+                                idx < months &&
+                                idx % labelInterval == 0) {
+                              final month = DateTime(
+                                now.year,
+                                now.month - (months - 1 - idx),
+                              );
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  DateFormat('MMM', 'fr_FR').format(month),
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: isMobile ? 9 : 12,
+                                  ),
                                 ),
                               );
                             }
-                            return const Text('');
+                            return const SizedBox.shrink();
                           },
                         ),
                       ),
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
+                          reservedSize: 44,
                           getTitlesWidget: (double value, TitleMeta meta) {
                             return Text(
                               '${(value / 1000).toInt()}k€',
@@ -1007,12 +1393,12 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
                     ),
                     borderData: FlBorderData(show: false),
                     minX: 0,
-                    maxX: 5,
+                    maxX: (months - 1).toDouble(),
                     minY: 0,
-                    maxY: 50000,
+                    maxY: maxY,
                     lineBarsData: [
                       LineChartBarData(
-                        spots: _generateTrendData(adminProvider),
+                        spots: trendData,
                         isCurved: true,
                         gradient: const LinearGradient(
                           colors: [Color(0xFF00D4FF), Color(0xFF8B5CF6)],
@@ -1040,6 +1426,639 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
           ),
         );
       },
+    );
+  }
+
+  /// 💹 Courbe PnL (Profit & Loss) mensuelle
+  Widget _buildPnLChart(AdminProvider adminProvider) {
+    final stats = _calculateStats(adminProvider);
+    final allPnlData = stats['pnlData'] as List<Map<String, dynamic>>;
+
+    // Filtrer selon la période sélectionnée
+    final months = _chartPeriodMonths;
+    final pnlData = allPnlData.length > months
+        ? allPnlData.sublist(allPnlData.length - months)
+        : allPnlData;
+
+    // Calculer le profit cumulé
+    double cumulProfit = 0;
+    final profitPoints = <FlSpot>[];
+    final cumulPoints = <FlSpot>[];
+    double maxVal = 0;
+
+    for (int i = 0; i < pnlData.length; i++) {
+      final profit = pnlData[i]['profit'] as double;
+      cumulProfit += profit;
+      profitPoints.add(FlSpot(i.toDouble(), profit));
+      cumulPoints.add(FlSpot(i.toDouble(), cumulProfit));
+
+      if (profit > maxVal) maxVal = profit;
+      if (cumulProfit > maxVal) maxVal = cumulProfit;
+    }
+
+    // Marge haute
+    final chartMax = maxVal > 0 ? maxVal * 1.3 : 1000.0;
+    final chartMin = 0.0;
+
+    // Capital en circulation = capital prêté - capital récupéré
+    final capitalEnCirculation =
+        (stats['capitalPrete'] as double) -
+        (stats['capitalRecouvre'] as double);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isMobile = constraints.maxWidth < 600;
+
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'PnL — Gains réels',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isMobile ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _buildLegendItem('Mensuel', const Color(0xFF00D4FF)),
+                  const SizedBox(width: 12),
+                  _buildLegendItem('Cumulé', const Color(0xFF10B981)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Intérêts + pénalités encaissés (hors flux de capital)',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 11,
+                ),
+              ),
+              SizedBox(height: isMobile ? 12 : 20),
+              SizedBox(
+                height: isMobile ? 200 : 240,
+                child: LineChart(
+                  LineChartData(
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: maxVal > 0
+                          ? (maxVal / 4).ceilToDouble().clamp(
+                              50,
+                              double.infinity,
+                            )
+                          : 500,
+                      getDrawingHorizontalLine: (value) {
+                        return FlLine(
+                          color: Colors.white.withOpacity(0.08),
+                          strokeWidth: 1,
+                        );
+                      },
+                    ),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: 1,
+                          getTitlesWidget: (double value, TitleMeta meta) {
+                            final idx = value.toInt();
+                            final labelStep = pnlData.length > 12
+                                ? 3
+                                : (isMobile ? 2 : 1);
+                            if (idx >= 0 &&
+                                idx < pnlData.length &&
+                                idx % labelStep == 0) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  pnlData[idx]['label'] as String,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.5),
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 44,
+                          getTitlesWidget: (double value, TitleMeta meta) {
+                            if (value < 0) return const SizedBox.shrink();
+                            String label;
+                            if (value >= 1000) {
+                              label = '${(value / 1000).toStringAsFixed(1)}k';
+                            } else {
+                              label = value.toInt().toString();
+                            }
+                            return Text(
+                              '$label€',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 10,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    minX: 0,
+                    maxX: (pnlData.length - 1).toDouble(),
+                    minY: chartMin,
+                    maxY: chartMax,
+                    lineBarsData: [
+                      // Profit mensuel (barres via area fill)
+                      LineChartBarData(
+                        spots: profitPoints,
+                        isCurved: false,
+                        color: const Color(0xFF00D4FF),
+                        barWidth: 2,
+                        isStrokeCapRound: true,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, percent, bar, index) {
+                            return FlDotCirclePainter(
+                              radius: 4,
+                              color: spot.y > 0
+                                  ? const Color(0xFF00D4FF)
+                                  : const Color(0xFF475569),
+                              strokeWidth: 1.5,
+                              strokeColor: Colors.white,
+                            );
+                          },
+                        ),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF00D4FF).withOpacity(0.2),
+                              const Color(0xFF00D4FF).withOpacity(0.02),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                      // Profit cumulé
+                      LineChartBarData(
+                        spots: cumulPoints,
+                        isCurved: true,
+                        color: const Color(0xFF10B981),
+                        barWidth: 3,
+                        isStrokeCapRound: true,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF10B981).withOpacity(0.15),
+                              const Color(0xFF10B981).withOpacity(0.02),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                    ],
+                    lineTouchData: LineTouchData(
+                      touchTooltipData: LineTouchTooltipData(
+                        getTooltipItems: (touchedSpots) {
+                          return touchedSpots.map((spot) {
+                            final isMonthly = spot.barIndex == 0;
+                            final label = isMonthly ? 'Mois' : 'Cumulé';
+                            return LineTooltipItem(
+                              '$label: ${_currencyFormat.format(spot.y)}',
+                              TextStyle(
+                                color: isMonthly
+                                    ? const Color(0xFF00D4FF)
+                                    : const Color(0xFF10B981),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            );
+                          }).toList();
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Résumé PnL — 4 indicateurs clés
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.spaceEvenly,
+                children: [
+                  _buildPnLSummaryChip(
+                    'Intérêts encaissés',
+                    _currencyFormat.format(stats['interetsRecouvres']),
+                    const Color(0xFF10B981),
+                  ),
+                  _buildPnLSummaryChip(
+                    'Pénalités perçues',
+                    _currencyFormat.format(
+                      adminProvider.allSchedules
+                          .where((s) => s.isPaid && s.hasPenalty)
+                          .fold<double>(
+                            0,
+                            (sum, s) => sum + (s.penaltyAmount ?? 0),
+                          ),
+                    ),
+                    const Color(0xFFF59E0B),
+                  ),
+                  _buildPnLSummaryChip(
+                    'Capital en circulation',
+                    _currencyFormat.format(capitalEnCirculation),
+                    const Color(0xFF3B82F6),
+                  ),
+                  _buildPnLSummaryChip(
+                    'Recouvrement',
+                    '${(stats['tauxRecouvrement'] as double).toStringAsFixed(1)}%',
+                    const Color(0xFF8B5CF6),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPnLSummaryChip(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10),
+        ),
+      ],
+    );
+  }
+
+  /// 🤝 Section Parrainages avec KPIs et liste des commissions à verser
+  Widget _buildReferralSection(AdminProvider adminProvider) {
+    final referrals = adminProvider.allReferrals;
+
+    // Calculs KPI parrainage
+    final uniqueParrains = referrals
+        .map((r) => r['parrainEmail'])
+        .toSet()
+        .length;
+    final totalBonusAVerser = referrals
+        .where((r) => r['statut'] == 'pret_decaisse')
+        .fold<double>(
+          0,
+          (sum, r) => sum + ((r['bonusParrain'] as num?)?.toDouble() ?? 0),
+        );
+    final totalBonusVerse = referrals
+        .where((r) => r['statut'] == 'verse')
+        .fold<double>(
+          0,
+          (sum, r) => sum + ((r['bonusParrain'] as num?)?.toDouble() ?? 0),
+        );
+    final referralsActifs = referrals
+        .where((r) => r['statut'] != 'verse')
+        .length;
+    final referralsAVerser = referrals
+        .where((r) => r['statut'] == 'pret_decaisse')
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // En-tête
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF9C27B0).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.card_giftcard,
+                color: Color(0xFF9C27B0),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Parrainages',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // KPIs parrainages
+        LayoutBuilder(
+          builder: (context, constraints) {
+            int crossAxisCount = constraints.maxWidth < 600 ? 2 : 4;
+            double childAspectRatio = constraints.maxWidth < 600 ? 1.8 : 1.5;
+
+            return GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: childAspectRatio,
+              children: [
+                _buildAdvancedKPICard(
+                  title: 'Parrains uniques',
+                  mainValue: '$uniqueParrains',
+                  subtitle: '$referralsActifs actifs',
+                  icon: Icons.people_outline,
+                  color: const Color(0xFF9C27B0),
+                ),
+                _buildAdvancedKPICard(
+                  title: 'À verser',
+                  mainValue: '${totalBonusAVerser.toStringAsFixed(2)}€',
+                  subtitle: '${referralsAVerser.length} commission(s)',
+                  icon: Icons.payments_outlined,
+                  color: const Color(0xFFFF9800),
+                ),
+                _buildAdvancedKPICard(
+                  title: 'Déjà versé',
+                  mainValue: '${totalBonusVerse.toStringAsFixed(2)}€',
+                  subtitle: 'Total commissions',
+                  icon: Icons.check_circle_outline,
+                  color: const Color(0xFF4CAF50),
+                ),
+                _buildAdvancedKPICard(
+                  title: 'Total parrainages',
+                  mainValue: '${referrals.length}',
+                  subtitle: 'Depuis le début',
+                  icon: Icons.handshake_outlined,
+                  color: const Color(0xFF3B82F6),
+                ),
+              ],
+            );
+          },
+        ),
+
+        // Liste des commissions à verser
+        if (referralsAVerser.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const Text(
+            'Commissions à verser',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...referralsAVerser.map(
+            (referral) => _buildReferralPayCard(referral, adminProvider),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReferralPayCard(
+    Map<String, dynamic> referral,
+    AdminProvider adminProvider,
+  ) {
+    final parrainEmail = referral['parrainEmail'] ?? '';
+    final filleulName = referral['filleulName'] ?? '';
+    final bonus = (referral['bonusParrain'] as num?)?.toDouble() ?? 0;
+    final montantPret = (referral['montantPret'] as num?)?.toDouble() ?? 0;
+    final referralId = referral['id'] ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF9C27B0).withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF9C27B0).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: const Icon(
+              Icons.card_giftcard,
+              color: Color(0xFF9C27B0),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  parrainEmail,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Filleul: $filleulName • Prêt: ${montantPret.toStringAsFixed(0)}€',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${bonus.toStringAsFixed(2)}€',
+                style: const TextStyle(
+                  color: Color(0xFFFF9800),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 30,
+                child: ElevatedButton(
+                  onPressed: adminProvider.isLoading
+                      ? null
+                      : () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Confirmer le versement'),
+                              content: Text(
+                                'Marquer la commission de ${bonus.toStringAsFixed(2)}€ pour $parrainEmail comme versée ?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Annuler'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF4CAF50),
+                                  ),
+                                  child: const Text('Confirmer'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true) {
+                            final success = await adminProvider
+                                .markReferralAsPaid(referralId);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    success
+                                        ? 'Commission versée avec succès !'
+                                        : 'Erreur lors du versement',
+                                  ),
+                                  backgroundColor: success
+                                      ? const Color(0xFF4CAF50)
+                                      : const Color(0xFFEF4444),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Versé ✓',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExportSection(AdminProvider adminProvider) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.download_rounded,
+                color: Color(0xFF10B981),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Export CSV',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildExportButton('Tous les prêts', Icons.assignment, () {
+                CsvExportService.exportLoans(adminProvider.allLoans);
+              }),
+              _buildExportButton(
+                'Échéancier complet',
+                Icons.calendar_month,
+                () {
+                  CsvExportService.exportSchedules(adminProvider.allSchedules);
+                },
+              ),
+              _buildExportButton('Recouvrement', Icons.warning_amber, () {
+                CsvExportService.exportOverdue(
+                  adminProvider.allLoans,
+                  adminProvider.allSchedules,
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExportButton(String label, IconData icon, VoidCallback onTap) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF10B981),
+        side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.4)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
@@ -1215,12 +2234,12 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
             // Statistiques financières
             _buildDetailedStatsCard('Finances', [
               _buildStatRow(
-                'Volume total',
-                _currencyFormat.format(stats['totalAmount']),
+                'Capital décaissé',
+                _currencyFormat.format(stats['capitalPrete']),
               ),
               _buildStatRow(
-                'Montant approuvé',
-                _currencyFormat.format(stats['approvedAmount']),
+                'Gains attendus',
+                _currencyFormat.format(stats['gainsTotauxAttendus']),
               ),
               _buildStatRow(
                 'En cours',
@@ -1321,11 +2340,15 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
   Map<String, dynamic> _calculateStats(AdminProvider adminProvider) {
     final allLoans = adminProvider.allLoans;
     final allUsers = adminProvider.allUsers;
+    final allSchedules = adminProvider.allSchedules;
+    final now = DateTime.now();
 
-    // Statistiques des prêts
-    final totalLoans = allLoans.length;
+    // ── Compteurs par statut ──
     final pendingLoans = allLoans
-        .where((l) => l.statut == LoanStatus.soumis)
+        .where(
+          (l) =>
+              l.statut == LoanStatus.soumis || l.statut == LoanStatus.enRevue,
+        )
         .length;
     final approvedLoans = allLoans
         .where((l) => l.statut == LoanStatus.approuve)
@@ -1347,149 +2370,116 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
           (l) => l.statut == LoanStatus.ferme || l.statut == LoanStatus.solde,
         )
         .length;
+    final totalLoans = allLoans.length;
 
-    // Statistiques financières
-    final totalAmount = allLoans.fold<double>(
-      0,
-      (sum, loan) => sum + loan.montant,
-    );
-    final approvedAmount = allLoans
+    // ── Prêts effectifs (décaissés / actifs / terminés) ──
+    // Exclut : brouillon, soumis, enRevue, approuvé (pas encore décaissé), refusé, annulé
+    final effectiveLoans = allLoans
         .where(
           (l) =>
-              l.statut == LoanStatus.approuve ||
+              l.statut == LoanStatus.decaissementEffectue ||
               l.statut == LoanStatus.enCours ||
-              l.statut == LoanStatus.ferme ||
+              l.statut == LoanStatus.enRetard ||
               l.statut == LoanStatus.solde ||
-              l.statut == LoanStatus.decaissementEffectue,
-        )
-        .fold<double>(0, (sum, loan) => sum + loan.montant);
-    final activeAmount = allLoans
-        .where((l) => l.statut == LoanStatus.enCours)
-        .fold<double>(0, (sum, loan) => sum + loan.montant);
-
-    final averageAmount = totalLoans > 0 ? totalAmount / totalLoans : 0.0;
-    final maxAmount = allLoans.isNotEmpty
-        ? allLoans.map((l) => l.montant).reduce((a, b) => a > b ? a : b)
-        : 0.0;
-    final minAmount = allLoans.isNotEmpty
-        ? allLoans.map((l) => l.montant).reduce((a, b) => a < b ? a : b)
-        : 0.0;
-
-    // 💰 NOUVELLES STATISTIQUES FINANCIÈRES
-
-    // Prêts ayant généré ou générant des intérêts (approuvés, en cours, terminés)
-    final profitableLoans = allLoans
-        .where(
-          (l) =>
-              l.statut == LoanStatus.approuve ||
-              l.statut == LoanStatus.enCours ||
-              l.statut == LoanStatus.solde ||
-              l.statut == LoanStatus.ferme ||
-              l.statut == LoanStatus.decaissementEffectue,
+              l.statut == LoanStatus.ferme,
         )
         .toList();
 
-    // Capital total réellement prêté
-    final capitalPrete = profitableLoans.fold<double>(
+    // ── Statistiques financières — sur prêts effectifs uniquement ──
+    final capitalPrete = effectiveLoans.fold<double>(
       0,
-      (sum, loan) => sum + loan.montant,
+      (s, l) => s + l.montant,
     );
-
-    // Gains totaux attendus (somme des intérêts de tous les prêts profitables)
-    final gainsTotauxAttendus = profitableLoans.fold<double>(
+    final gainsTotauxAttendus = effectiveLoans.fold<double>(
       0,
-      (sum, loan) => sum + loan.coutTotalEstime,
+      (s, l) => s + l.coutTotalEstime,
     );
+    final activeAmount = allLoans
+        .where((l) => l.statut == LoanStatus.enCours)
+        .fold<double>(0, (s, l) => s + l.montant);
 
-    // ✅ NOUVEAU : Calcul des sommes réellement recouvrées
-    final allSchedules = adminProvider.allSchedules;
-
-    // Sommes totales recouvrées (échéances payées)
-    final sommesRecouvertes = allSchedules
-        .where((schedule) => schedule.isPaid)
-        .fold<double>(0, (sum, schedule) => sum + schedule.total);
-
-    // Capital recouvré (sommes principales payées)
-    final capitalRecouvre = allSchedules
-        .where((schedule) => schedule.isPaid)
-        .fold<double>(0, (sum, schedule) => sum + schedule.principal);
-
-    // Intérêts recouvrés (sommes d'intérêts payées)
-    final interetsRecouvres = allSchedules
-        .where((schedule) => schedule.isPaid)
-        .fold<double>(0, (sum, schedule) => sum + schedule.interet);
-
-    // Taux de recouvrement (% du capital prêté qui a été récupéré)
-    final tauxRecouvrement = capitalPrete > 0
-        ? (capitalRecouvre / capitalPrete) * 100
-        : 0.0;
-
-    // Rendement total attendu (%)
+    // Rendement = intérêts attendus / capital décaissé
+    // NB : coutTotalEstime = intérêts seulement (pas capital + intérêts)
     final rendementTotal = capitalPrete > 0
         ? (gainsTotauxAttendus / capitalPrete) * 100
         : 0.0;
 
-    // Taux moyen pondéré par montant
+    // Taux moyen pondéré par montant (prêts effectifs)
     double tauxMoyenPondere = 0.0;
-    if (profitableLoans.isNotEmpty && capitalPrete > 0) {
-      final sommePonderee = profitableLoans.fold<double>(
+    if (effectiveLoans.isNotEmpty && capitalPrete > 0) {
+      final sommePonderee = effectiveLoans.fold<double>(
         0,
-        (sum, loan) => sum + (loan.tauxAnnuel * loan.montant),
+        (s, l) => s + (l.tauxAnnuel * l.montant),
       );
       tauxMoyenPondere = sommePonderee / capitalPrete;
     }
 
-    // Statistiques des utilisateurs
+    // ── Recouvrement (échéances payées) ──
+    final paidSchedules = allSchedules.where((s) => s.isPaid);
+    final sommesRecouvertes = paidSchedules.fold<double>(
+      0,
+      (s, e) => s + e.total,
+    );
+    final capitalRecouvre = paidSchedules.fold<double>(
+      0,
+      (s, e) => s + e.principal,
+    );
+    final interetsRecouvres = paidSchedules.fold<double>(
+      0,
+      (s, e) => s + e.interet,
+    );
+    final tauxRecouvrement = capitalPrete > 0
+        ? (capitalRecouvre / capitalPrete) * 100
+        : 0.0;
+
+    // ── Onglet Statistiques — Volume total (tous prêts effectifs) ──
+    final approvedAmount = effectiveLoans.fold<double>(
+      0,
+      (s, l) => s + l.montant,
+    );
+    // Pour le "Volume total" et stats de l'onglet, on garde tous les prêts en info
+    final totalAmount = allLoans.fold<double>(0, (s, l) => s + l.montant);
+    // Montant moyen sur prêts effectifs
+    final averageAmount = effectiveLoans.isNotEmpty
+        ? effectiveLoans.fold<double>(0, (s, l) => s + l.montant) /
+              effectiveLoans.length
+        : 0.0;
+    final maxAmount = effectiveLoans.isNotEmpty
+        ? effectiveLoans.map((l) => l.montant).reduce((a, b) => a > b ? a : b)
+        : 0.0;
+    final minAmount = effectiveLoans.isNotEmpty
+        ? effectiveLoans.map((l) => l.montant).reduce((a, b) => a < b ? a : b)
+        : 0.0;
+
+    // ── Utilisateurs ──
     final totalUsers = allUsers.length;
     final borrowers = allUsers.where((u) => u.role == UserRole.borrower).length;
     final admins = allUsers.where((u) => u.role == UserRole.admin).length;
     final superAdmins = allUsers
         .where((u) => u.role == UserRole.superAdmin)
         .length;
-
-    final now = DateTime.now();
     final thisMonth = DateTime(now.year, now.month);
     final newUsersThisMonth = allUsers
         .where((u) => u.createdAt.isAfter(thisMonth))
         .length;
-
-    // Utilisateurs ayant au moins un prêt
     final activeUsers = allUsers
         .where((u) => allLoans.any((l) => l.userId == u.id))
         .length;
 
-    // 📊 NOUVEAUX KPIs AVANCÉS
-
-    // 1. Plus gros créancier (emprunteur avec le plus gros montant total)
-    // ✅ CORRECTION : Ne compter que les prêts approuvés/actifs/terminés
+    // ── KPI : Plus gros emprunteur (prêts effectifs uniquement) ──
     String plusGrosCreancier = 'Aucun';
     double plusGrosMontant = 0;
-
-    if (allUsers.isNotEmpty && allLoans.isNotEmpty) {
-      final montantsParUtilisateur = <String, double>{};
-
-      // Filtrer uniquement les prêts valides (pas les brouillons ni refusés)
-      final loansValides = allLoans
-          .where(
-            (loan) =>
-                loan.statut == LoanStatus.approuve ||
-                loan.statut == LoanStatus.enCours ||
-                loan.statut == LoanStatus.solde ||
-                loan.statut == LoanStatus.decaissementEffectue,
-          )
-          .toList();
-
-      for (final loan in loansValides) {
+    if (allUsers.isNotEmpty && effectiveLoans.isNotEmpty) {
+      final montantsParUser = <String, double>{};
+      for (final loan in effectiveLoans) {
         final user = allUsers.where((u) => u.id == loan.userId).firstOrNull;
         if (user != null) {
           final key = '${user.prenom} ${user.nom}';
-          montantsParUtilisateur[key] =
-              (montantsParUtilisateur[key] ?? 0) + loan.montant;
+          montantsParUser[key] = (montantsParUser[key] ?? 0) + loan.montant;
         }
       }
-
-      if (montantsParUtilisateur.isNotEmpty) {
-        final maxEntry = montantsParUtilisateur.entries.reduce(
+      if (montantsParUser.isNotEmpty) {
+        final maxEntry = montantsParUser.entries.reduce(
           (a, b) => a.value > b.value ? a : b,
         );
         plusGrosCreancier = maxEntry.key;
@@ -1497,45 +2487,75 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
       }
     }
 
-    // 2. État des paiements (VRAIES DONNÉES Firebase)
-    // Note: allSchedules déjà récupéré plus haut pour calcul des recouvrements
-
-    // Compter les échéances totales et celles en retard
-    int totalEcheances = 0;
+    // ── KPI : Paiements dans les temps ──
+    int totalEcheancesDues = 0;
     int echeancesEnRetard = 0;
-
     for (final schedule in allSchedules) {
-      // Échéance non payée avec date d'échéance dépassée = en retard
-      if (!schedule.isPaid && schedule.dueDate.isBefore(now)) {
-        echeancesEnRetard++;
-      }
-      // Compter toutes les échéances dues (passées ou actuelles)
       if (schedule.dueDate.isBefore(now) ||
           schedule.dueDate.isAtSameMomentAs(now)) {
-        totalEcheances++;
+        totalEcheancesDues++;
+        if (!schedule.isPaid) echeancesEnRetard++;
       }
     }
-
-    final pourcentageDansLesTemps = totalEcheances > 0
-        ? ((totalEcheances - echeancesEnRetard) / totalEcheances * 100)
+    final pourcentageDansLesTemps = totalEcheancesDues > 0
+        ? ((totalEcheancesDues - echeancesEnRetard) / totalEcheancesDues * 100)
         : 100.0;
-    final pourcentageEnRetard = totalEcheances > 0
-        ? (echeancesEnRetard / totalEcheances * 100)
-        : 0.0; // 3. Taux de défaut (prêts refusés sur total des demandes)
-    final tauxDefaut = totalLoans > 0
-        ? (rejectedLoans / totalLoans * 100)
+    final pourcentageEnRetard = totalEcheancesDues > 0
+        ? (echeancesEnRetard / totalEcheancesDues * 100)
         : 0.0;
 
-    // 4. Durée moyenne des prêts (en mois)
-    final dureeMoyenne = allLoans.isNotEmpty
-        ? allLoans.fold<double>(0, (sum, loan) => sum + loan.dureeMois) /
-              allLoans.length
+    // ── KPI : Taux de rejet (prêts refusés / total demandes) ──
+    final tauxRejet = totalLoans > 0 ? (rejectedLoans / totalLoans * 100) : 0.0;
+
+    // ── KPI : Taux de défaut (prêts en retard / prêts effectifs) ──
+    final tauxDefaut = effectiveLoans.isNotEmpty
+        ? (lateLoans / effectiveLoans.length * 100)
         : 0.0;
 
-    // 5. Montant moyen par utilisateur actif
-    final montantMoyenParUtilisateur = activeUsers > 0
-        ? totalAmount / activeUsers
+    // ── KPI : Durée moyenne (prêts effectifs uniquement) ──
+    final dureeMoyenne = effectiveLoans.isNotEmpty
+        ? effectiveLoans.fold<double>(0, (s, l) => s + l.dureeMois) /
+              effectiveLoans.length
         : 0.0;
+
+    // ── PnL mensuel (24 derniers mois) ──
+    // PnL = profits réels = intérêts encaissés + pénalités encaissées
+    // Le capital (prêté/remboursé) N'EST PAS du profit, on ne le mélange pas
+    final pnlData = <Map<String, dynamic>>[];
+    for (int i = 23; i >= 0; i--) {
+      final month = DateTime(now.year, now.month - i);
+      final monthEnd = DateTime(now.year, now.month - i + 1);
+
+      // Échéances payées ce mois
+      final paidThisMonth = allSchedules.where((s) {
+        if (!s.isPaid) return false;
+        final date = s.paidAt ?? s.dueDate;
+        return !date.isBefore(month) && date.isBefore(monthEnd);
+      });
+
+      // Intérêts encaissés ce mois (= le VRAI profit)
+      final interetsMois = paidThisMonth.fold<double>(
+        0,
+        (sum, s) => sum + s.interet,
+      );
+
+      // Pénalités encaissées ce mois
+      final penalitesMois = paidThisMonth.fold<double>(
+        0,
+        (sum, s) => sum + (s.penaltyAmount ?? 0),
+      );
+
+      // Profit du mois = intérêts + pénalités
+      final profitMois = interetsMois + penalitesMois;
+
+      pnlData.add({
+        'month': month,
+        'label': DateFormat('MMM yy', 'fr_FR').format(month),
+        'interets': interetsMois,
+        'penalites': penalitesMois,
+        'profit': profitMois,
+      });
+    }
 
     return {
       'totalLoans': totalLoans,
@@ -1558,36 +2578,47 @@ class _ModernAdminDashboardScreenState extends State<ModernAdminDashboardScreen>
       'superAdmins': superAdmins,
       'activeUsers': activeUsers,
       'newUsersThisMonth': newUsersThisMonth,
-      // 💰 Nouvelles statistiques financières
       'capitalPrete': capitalPrete,
       'gainsTotauxAttendus': gainsTotauxAttendus,
       'rendementTotal': rendementTotal,
       'tauxMoyenPondere': tauxMoyenPondere,
-      // 📊 Nouveaux KPIs avancés
       'plusGrosCreancier': plusGrosCreancier,
       'plusGrosMontant': plusGrosMontant,
       'pourcentageDansLesTemps': pourcentageDansLesTemps,
       'pourcentageEnRetard': pourcentageEnRetard,
+      'tauxRejet': tauxRejet,
       'tauxDefaut': tauxDefaut,
       'dureeMoyenne': dureeMoyenne,
-      'montantMoyenParUtilisateur': montantMoyenParUtilisateur,
-      // 💵 Statistiques de recouvrement
       'sommesRecouvertes': sommesRecouvertes,
       'capitalRecouvre': capitalRecouvre,
       'interetsRecouvres': interetsRecouvres,
       'tauxRecouvrement': tauxRecouvrement,
+      'pnlData': pnlData,
     };
   }
 
+  int get _chartPeriodMonths {
+    switch (_chartPeriod) {
+      case '3m':
+        return 3;
+      case '6m':
+        return 6;
+      case '1a':
+        return 12;
+      case 'tout':
+        return 24;
+      default:
+        return 6;
+    }
+  }
+
   List<FlSpot> _generateTrendData(AdminProvider adminProvider) {
-    // Générer des données de tendance basées sur les vrais prêts
-    // Pour l'exemple, nous utiliserons des données simulées mais vous pouvez
-    // les remplacer par de vraies données groupées par mois
     final now = DateTime.now();
     final data = <FlSpot>[];
+    final months = _chartPeriodMonths;
 
-    for (int i = 0; i < 6; i++) {
-      final month = DateTime(now.year, now.month - (5 - i));
+    for (int i = 0; i < months; i++) {
+      final month = DateTime(now.year, now.month - (months - 1 - i));
       final monthlyAmount = adminProvider.allLoans
           .where(
             (loan) =>

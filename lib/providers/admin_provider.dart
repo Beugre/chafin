@@ -1,4 +1,6 @@
+import '../utils/logger.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../models/loan_model.dart';
 import '../models/schedule_item_model.dart';
@@ -11,6 +13,7 @@ class AdminProvider extends ChangeNotifier {
   List<LoanModel> _allLoans = [];
   List<UserModel> _allUsers = [];
   List<ScheduleItemModel> _allSchedules = [];
+  List<Map<String, dynamic>> _allReferrals = [];
   Map<String, dynamic> _stats = {};
   bool _isLoading = false;
   String? _error;
@@ -19,13 +22,19 @@ class AdminProvider extends ChangeNotifier {
   List<LoanModel> get allLoans => _allLoans;
   List<UserModel> get allUsers => _allUsers;
   List<ScheduleItemModel> get allSchedules => _allSchedules;
+  List<Map<String, dynamic>> get allReferrals => _allReferrals;
   Map<String, dynamic> get stats => _stats;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
   // Getters filtrés pour les prêts
-  List<LoanModel> get pendingLoans =>
-      _allLoans.where((loan) => loan.statut == LoanStatus.soumis).toList();
+  List<LoanModel> get pendingLoans => _allLoans
+      .where(
+        (loan) =>
+            loan.statut == LoanStatus.soumis ||
+            loan.statut == LoanStatus.enRevue,
+      )
+      .toList();
 
   List<LoanModel> get approvedLoans =>
       _allLoans.where((loan) => loan.statut == LoanStatus.approuve).toList();
@@ -68,93 +77,78 @@ class AdminProvider extends ChangeNotifier {
   }
 
   /// Charger tous les prêts
-  Future<void> loadAllLoans() async {
+  Future<void> loadAllLoans({bool bulk = false}) async {
     try {
-      _setLoading(true);
-      _clearError();
+      if (!bulk) {
+        _setLoading(true);
+        _clearError();
+      }
 
       _allLoans = await _adminService.getAllLoans();
 
-      print('=== AdminProvider.loadAllLoans ===');
-      print('Prêts chargés: ${_allLoans.length}');
-      for (var loan in _allLoans) {
-        print('- Prêt ${loan.id}: ${loan.montant}€, ${loan.statut}');
-      }
-
-      notifyListeners();
+      if (!bulk) notifyListeners();
     } catch (e) {
-      print('Erreur AdminProvider.loadAllLoans: $e');
+      debugLog('Erreur AdminProvider.loadAllLoans: $e');
       _setError(e.toString());
     } finally {
-      _setLoading(false);
+      if (!bulk) _setLoading(false);
     }
   }
 
   /// Charger tous les utilisateurs
-  Future<void> loadAllUsers() async {
+  Future<void> loadAllUsers({bool bulk = false}) async {
     try {
-      _setLoading(true);
-      _clearError();
+      if (!bulk) {
+        _setLoading(true);
+        _clearError();
+      }
 
       _allUsers = await _adminService.getAllUsers();
 
-      print('=== AdminProvider.loadAllUsers ===');
-      print('Utilisateurs chargés: ${_allUsers.length}');
-      for (var user in _allUsers) {
-        print('- ${user.nom} (${user.email}): ${user.role}');
-      }
-
-      notifyListeners();
+      if (!bulk) notifyListeners();
     } catch (e) {
-      print('Erreur AdminProvider.loadAllUsers: $e');
+      debugLog('Erreur AdminProvider.loadAllUsers: $e');
       _setError(e.toString());
     } finally {
-      _setLoading(false);
+      if (!bulk) _setLoading(false);
     }
   }
 
   /// Charger tous les échéanciers
-  Future<void> loadAllSchedules() async {
+  Future<void> loadAllSchedules({bool bulk = false}) async {
     try {
-      _setLoading(true);
-      _clearError();
+      if (!bulk) {
+        _setLoading(true);
+        _clearError();
+      }
 
       _allSchedules = await _adminService.getAllSchedules();
 
-      print('=== AdminProvider.loadAllSchedules ===');
-      print('Schedules chargés: ${_allSchedules.length}');
-      for (var schedule in _allSchedules) {
-        print(
-          '- Schedule ${schedule.id}: ${schedule.isPaid ? "payé" : "non payé"}, échéance: ${schedule.dueDate}',
-        );
-      }
-
-      notifyListeners();
+      if (!bulk) notifyListeners();
     } catch (e) {
-      print('Erreur AdminProvider.loadAllSchedules: $e');
+      debugLog('Erreur AdminProvider.loadAllSchedules: $e');
       _setError(e.toString());
     } finally {
-      _setLoading(false);
+      if (!bulk) _setLoading(false);
     }
   }
 
   /// Charger les statistiques
-  Future<void> loadStats() async {
+  Future<void> loadStats({bool bulk = false}) async {
     try {
-      _setLoading(true);
-      _clearError();
+      if (!bulk) {
+        _setLoading(true);
+        _clearError();
+      }
 
       _stats = await _adminService.getGlobalStats();
 
-      print('=== AdminProvider.loadStats ===');
-      print('Statistiques: $_stats');
-
-      notifyListeners();
+      if (!bulk) notifyListeners();
     } catch (e) {
-      print('Erreur AdminProvider.loadStats: $e');
+      debugLog('Erreur AdminProvider.loadStats: $e');
       _setError(e.toString());
     } finally {
-      _setLoading(false);
+      if (!bulk) _setLoading(false);
     }
   }
 
@@ -170,10 +164,10 @@ class AdminProvider extends ChangeNotifier {
       await loadAllLoans();
       await loadStats();
 
-      print('Prêt $loanId approuvé avec succès');
+      debugLog('Prêt $loanId approuvé avec succès');
       return true;
     } catch (e) {
-      print('Erreur approbation prêt: $e');
+      debugLog('Erreur approbation prêt: $e');
       _setError(e.toString());
       return false;
     } finally {
@@ -193,10 +187,10 @@ class AdminProvider extends ChangeNotifier {
       await loadAllLoans();
       await loadStats();
 
-      print('Prêt $loanId rejeté avec succès');
+      debugLog('Prêt $loanId rejeté avec succès');
       return true;
     } catch (e) {
-      print('Erreur rejet prêt: $e');
+      debugLog('Erreur rejet prêt: $e');
       _setError(e.toString());
       return false;
     } finally {
@@ -207,20 +201,66 @@ class AdminProvider extends ChangeNotifier {
   /// Charger toutes les données admin
   Future<void> loadAllAdminData() async {
     try {
-      print('=== AdminProvider.loadAllAdminData ===');
+      _setLoading(true);
+      _clearError();
 
-      // Charger en parallèle pour optimiser les performances
       await Future.wait([
-        loadAllLoans(),
-        loadAllUsers(),
-        loadAllSchedules(),
-        loadStats(),
+        loadAllLoans(bulk: true),
+        loadAllUsers(bulk: true),
+        loadAllSchedules(bulk: true),
+        loadStats(bulk: true),
+        loadAllReferrals(bulk: true),
       ]);
 
-      print('Toutes les données admin chargées');
+      notifyListeners();
     } catch (e) {
-      print('Erreur chargement données admin: $e');
+      debugLog('Erreur chargement données admin: $e');
       _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Charger tous les parrainages
+  Future<void> loadAllReferrals({bool bulk = false}) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('referrals')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      _allReferrals = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      if (!bulk) notifyListeners();
+    } catch (e) {
+      debugLog('Erreur chargement parrainages: $e');
+    }
+  }
+
+  /// Marquer une commission de parrainage comme versée
+  Future<bool> markReferralAsPaid(String referralId) async {
+    try {
+      _setLoading(true);
+      _clearError();
+
+      final loanService = LoanService();
+      await loanService.markReferralAsPaid(referralId);
+
+      // Recharger les parrainages
+      await loadAllReferrals();
+
+      debugLog('Commission $referralId marquée comme versée');
+      return true;
+    } catch (e) {
+      debugLog('Erreur marquage commission: $e');
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -244,7 +284,7 @@ class AdminProvider extends ChangeNotifier {
         }
         return user;
       } catch (e2) {
-        print('Erreur récupération utilisateur $userId: $e2');
+        debugLog('Erreur récupération utilisateur $userId: $e2');
         return null;
       }
     }
@@ -282,10 +322,11 @@ class AdminProvider extends ChangeNotifier {
 
   /// Vider toutes les données (pour déconnexion)
   void clearAllData() {
-    print('=== AdminProvider.clearAllData ===');
+    debugLog('=== AdminProvider.clearAllData ===');
     _allLoans.clear();
     _allUsers.clear();
     _allSchedules.clear();
+    _allReferrals.clear();
     _stats.clear();
     _error = null;
     _isLoading = false;

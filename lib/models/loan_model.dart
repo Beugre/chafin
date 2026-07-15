@@ -48,9 +48,13 @@ class LoanModel {
   montantRemboursementAnticipe; // Montant remboursé par anticipation
   final int? nouvelleDureeMois; // Nouvelle durée après remboursement anticipé
 
+  // Parrainage
+  final String? parrainEmail; // Email du parrain (uniquement si premier prêt)
+
   // Flags de contrôle admin
   final bool emailsDisabled; // Désactiver les emails de relance pour ce prêt
   final bool penaltiesDisabled; // Désactiver les pénalités pour ce prêt
+  final String? reconnaissanceDetteUrl; // URL du PDF reconnaissance de dette
 
   const LoanModel({
     required this.id,
@@ -80,8 +84,10 @@ class LoanModel {
     this.dateRemboursementAnticipe,
     this.montantRemboursementAnticipe,
     this.nouvelleDureeMois,
+    this.parrainEmail,
     this.emailsDisabled = false,
     this.penaltiesDisabled = false,
+    this.reconnaissanceDetteUrl,
   });
 
   factory LoanModel.fromJson(Map<String, dynamic> json) {
@@ -163,8 +169,10 @@ class LoanModel {
       montantRemboursementAnticipe:
           (json['montantRemboursementAnticipe'] as num?)?.toDouble(),
       nouvelleDureeMois: (json['nouvelleDureeMois'] as num?)?.toInt(),
+      parrainEmail: json['parrainEmail']?.toString(),
       emailsDisabled: json['emailsDisabled'] as bool? ?? false,
       penaltiesDisabled: json['penaltiesDisabled'] as bool? ?? false,
+      reconnaissanceDetteUrl: json['reconnaissanceDetteUrl']?.toString(),
     );
   }
 
@@ -196,8 +204,10 @@ class LoanModel {
       'dateRemboursementAnticipe': dateRemboursementAnticipe?.toIso8601String(),
       'montantRemboursementAnticipe': montantRemboursementAnticipe,
       'nouvelleDureeMois': nouvelleDureeMois,
+      'parrainEmail': parrainEmail,
       'emailsDisabled': emailsDisabled,
       'penaltiesDisabled': penaltiesDisabled,
+      'reconnaissanceDetteUrl': reconnaissanceDetteUrl,
     };
   }
 
@@ -228,8 +238,10 @@ class LoanModel {
     DateTime? dateRemboursementAnticipe,
     double? montantRemboursementAnticipe,
     int? nouvelleDureeMois,
+    String? parrainEmail,
     bool? emailsDisabled,
     bool? penaltiesDisabled,
+    String? reconnaissanceDetteUrl,
   }) {
     return LoanModel(
       id: id ?? this.id,
@@ -263,8 +275,11 @@ class LoanModel {
       montantRemboursementAnticipe:
           montantRemboursementAnticipe ?? this.montantRemboursementAnticipe,
       nouvelleDureeMois: nouvelleDureeMois ?? this.nouvelleDureeMois,
+      parrainEmail: parrainEmail ?? this.parrainEmail,
       emailsDisabled: emailsDisabled ?? this.emailsDisabled,
       penaltiesDisabled: penaltiesDisabled ?? this.penaltiesDisabled,
+      reconnaissanceDetteUrl:
+          reconnaissanceDetteUrl ?? this.reconnaissanceDetteUrl,
     );
   }
 

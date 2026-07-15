@@ -154,6 +154,18 @@ class EmailService {
         subject = '🔔 Nouvelle demande de prêt - Action requise';
         body = _buildAdminLoanRequestEmail(userName, loanData);
         break;
+      case LoanEmailType.referralLoanRequested:
+        subject = '🤝 Votre filleul a fait une demande de prêt';
+        body = _buildReferralLoanRequestedEmail(userName, loanData);
+        break;
+      case LoanEmailType.referralLoanDisbursed:
+        subject = '💰 Le prêt de votre filleul a été décaissé';
+        body = _buildReferralLoanDisbursedEmail(userName, loanData);
+        break;
+      case LoanEmailType.referralCommissionPaid:
+        subject = '🎉 Votre commission de parrainage a été versée';
+        body = _buildReferralCommissionPaidEmail(userName, loanData);
+        break;
     }
 
     // Enregistrer la tentative d'envoi
@@ -204,12 +216,28 @@ class EmailService {
 
   /// Récupère les emails de tous les administrateurs
   static Future<List<String>> _getAdminEmails() async {
+    // Lire depuis config/adminEmails (accessible par tous les utilisateurs authentifiés)
+    try {
+      final configDoc = await FirebaseFirestore.instance
+          .collection('config')
+          .doc('adminEmails')
+          .get();
+      if (configDoc.exists) {
+        final emails = configDoc.data()?['emails'] as List<dynamic>?;
+        if (emails != null && emails.isNotEmpty) {
+          return emails.cast<String>().toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Fallback: lecture config/adminEmails échouée: $e');
+    }
+
+    // Fallback: requête users (fonctionne uniquement si appelé par un admin)
     try {
       final adminQuery = await FirebaseFirestore.instance
           .collection('users')
           .where('role', isEqualTo: 'admin')
           .get();
-
       return adminQuery.docs
           .map((doc) => doc.data()['email'] as String?)
           .where((email) => email != null)
@@ -302,11 +330,11 @@ class EmailService {
         }
       }
     } catch (e) {
-      // En cas d'erreur de lecture, BLOQUER par sécurité
+      // En cas d'erreur de lecture (ex: permissions Firestore), AUTORISER l'envoi
+      // Les règles Firestore peuvent empêcher la lecture pour les emprunteurs
       debugPrint(
-        '⛔ [FIRESTORE KILL SWITCH] Erreur lecture config → BLOQUÉ par sécurité: $e',
+        '⚠️ [FIRESTORE KILL SWITCH] Erreur lecture config → envoi autorisé par défaut: $e',
       );
-      return false;
     }
 
     // Vérifier si EmailJS est configuré
@@ -696,6 +724,100 @@ class EmailService {
     </html>
     ''';
   }
+
+  static String _buildReferralLoanRequestedEmail(
+    String userName,
+    Map<String, dynamic> loanData,
+  ) {
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
+            <h1 style="color: #2196F3; text-align: center;">Chafin Loans</h1>
+            <h2 style="color: #9C27B0;">🤝 Parrainage - Nouvelle demande</h2>
+            
+            <p>Bonjour $userName,</p>
+            
+            <p>Bonne nouvelle ! Votre filleul <strong>${loanData['filleulName']}</strong> vient de soumettre une demande de prêt sur Chafin Loans en vous désignant comme parrain.</p>
+            
+            <div style="background-color: #f3e5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                <p><strong>Filleul :</strong> ${loanData['filleulName']}</p>
+                <p><strong>Montant demandé :</strong> ${loanData['amount']}€</p>
+                <p><strong>Durée :</strong> ${loanData['duration']} mois</p>
+            </div>
+            
+            <p>La demande est en cours de traitement. Vous serez informé(e) dès que le prêt sera décaissé et votre commission calculée.</p>
+            
+            <p>Cordialement,<br>L'équipe Chafin Loans</p>
+        </div>
+    </body>
+    </html>
+    ''';
+  }
+
+  static String _buildReferralLoanDisbursedEmail(
+    String userName,
+    Map<String, dynamic> loanData,
+  ) {
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
+            <h1 style="color: #2196F3; text-align: center;">Chafin Loans</h1>
+            <h2 style="color: #4CAF50;">💰 Parrainage - Prêt décaissé</h2>
+            
+            <p>Bonjour $userName,</p>
+            
+            <p>Le prêt de votre filleul <strong>${loanData['filleulName']}</strong> a été décaissé avec succès !</p>
+            
+            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                <p><strong>Filleul :</strong> ${loanData['filleulName']}</p>
+                <p><strong>Montant du prêt :</strong> ${loanData['amount']}€</p>
+                <p><strong>Intérêts totaux :</strong> ${loanData['interetsTotal']}€</p>
+                <p><strong>Votre commission (20%) :</strong> ${loanData['bonusParrain']}€</p>
+            </div>
+            
+            <p>Votre commission vous sera versée prochainement. Vous recevrez un email de confirmation lors du paiement.</p>
+            
+            <p>Cordialement,<br>L'équipe Chafin Loans</p>
+        </div>
+    </body>
+    </html>
+    ''';
+  }
+
+  static String _buildReferralCommissionPaidEmail(
+    String userName,
+    Map<String, dynamic> loanData,
+  ) {
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
+            <h1 style="color: #2196F3; text-align: center;">Chafin Loans</h1>
+            <h2 style="color: #FF9800;">🎉 Commission de parrainage versée !</h2>
+            
+            <p>Bonjour $userName,</p>
+            
+            <p>Votre commission de parrainage pour le prêt de <strong>${loanData['filleulName']}</strong> a été versée !</p>
+            
+            <div style="background-color: #fff3e0; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                <p><strong>Filleul :</strong> ${loanData['filleulName']}</p>
+                <p><strong>Montant de la commission :</strong> ${loanData['bonusParrain']}€</p>
+                <p><strong>Date de versement :</strong> ${loanData['paidDate']}</p>
+            </div>
+            
+            <p>Merci pour votre confiance et votre parrainage !</p>
+            
+            <p>Cordialement,<br>L'équipe Chafin Loans</p>
+        </div>
+    </body>
+    </html>
+    ''';
+  }
 }
 
 /// Types d'emails pour les prêts
@@ -710,6 +832,9 @@ enum LoanEmailType {
   loanCompleted, // ✅ Prêt entièrement remboursé
   rateChanged, // 📊 Taux d'intérêt modifié
   adminLoanRequest, // 👨‍💼 Nouvelle demande pour admin
+  referralLoanRequested, // 🤝 Parrain: filleul a fait une demande
+  referralLoanDisbursed, // 🤝 Parrain: prêt décaissé + montant commission
+  referralCommissionPaid, // 🤝 Parrain: commission versée
 }
 
 /// Extensions pour le service EmailService

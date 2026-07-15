@@ -17,6 +17,7 @@ import '../screens/admin/reminder_test_screen.dart';
 import '../screens/admin/risk_management_screen.dart';
 import '../screens/admin/edit_schedule_dates_screen.dart';
 import '../screens/admin/loan_review_screen.dart';
+import '../screens/admin/admin_chat_screen.dart';
 import '../screens/notification_test_screen.dart';
 import '../screens/payment_schedule_list_screen.dart';
 import '../screens/borrower/edit_profile_screen.dart';
@@ -61,6 +62,7 @@ class AppRouter {
         '/loan/create',
         '/notifications',
         '/payment-schedule',
+        '/chat',
       ];
 
       // Routes partagées (accessibles par admin et emprunteur)
@@ -156,6 +158,12 @@ class AppRouter {
         builder: (context, state) => const LoanRequestScreen(),
       ),
       GoRoute(
+        path: '/chat',
+        name: 'chat',
+        builder: (context, state) =>
+            const MainAppScreen(initialLocation: '/chat'),
+      ),
+      GoRoute(
         path: '/loan-details/:loanId',
         name: 'loan-details',
         builder: (context, state) {
@@ -221,6 +229,11 @@ class AppRouter {
           final loan = state.extra as LoanModel;
           return EditScheduleDatesScreen(loan: loan);
         },
+      ),
+      GoRoute(
+        path: '/admin/chat',
+        name: 'admin-chat',
+        builder: (context, state) => const AdminChatScreen(),
       ),
 
       // Route de setup admin (développement uniquement)

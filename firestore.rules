@@ -25,6 +25,42 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── Collection : config (kill switch, admin emails, etc.) ──────
+    match /config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ── Collection : email_logs ────────────────────────────────────
+    match /email_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+    }
+
+    // ── Collection : reminder_logs ─────────────────────────────────
+    match /reminder_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── Collection : penalty_logs ──────────────────────────────────
+    match /penalty_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── Collection : risk_assessments ──────────────────────────────
+    match /risk_assessments/{assessmentId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── Collection : audit_logs ────────────────────────────────────
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+    }
+
     // ── Collection : loans ─────────────────────────────────────────
     match /loans/{loanId} {
       allow read: if isAuthenticated()
@@ -57,6 +93,34 @@ service cloud.firestore {
       allow update: if isAuthenticated()
         && resource.data.userId == request.auth.uid;
       allow delete: if isAdmin();
+    }
+
+    // ── Collection : referrals (parrainage) ────────────────────────
+    match /referrals/{referralId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Collection : conversations (messagerie) ────────────────────
+    match /conversations/{convId} {
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+
+      // Sous-collection : messages
+      match /messages/{msgId} {
+        allow read: if isAuthenticated()
+          && (get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid || isAdmin());
+        allow create: if isAuthenticated()
+          && (get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid || isAdmin());
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
     }
 
     // ── Collection : repayments ────────────────────────────────────

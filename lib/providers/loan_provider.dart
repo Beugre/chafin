@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:flutter/material.dart';
 import '../models/loan_model.dart';
 import '../models/schedule_item_model.dart';
@@ -99,6 +100,7 @@ class LoanProvider with ChangeNotifier {
     required int dureeMois,
     // required String objetPret, // SUPPRIMÉ
     required DateTime dateSouhaitee,
+    String? parrainEmail,
   }) async {
     _setLoading(true);
     _clearError();
@@ -112,13 +114,14 @@ class LoanProvider with ChangeNotifier {
         dureeMois: dureeMois,
         // objetPret: objetPret, // SUPPRIMÉ
         dateSouhaitee: dateSouhaitee,
+        parrainEmail: parrainEmail,
       );
 
       _userLoans.insert(0, loan);
 
       // ✨ NOUVEAU : Notification par email aux administrateurs
       try {
-        print(
+        debugLog(
           '📧 Envoi de notifications aux administrateurs pour nouvelle demande',
         );
 
@@ -137,9 +140,9 @@ class LoanProvider with ChangeNotifier {
           },
         );
 
-        print('✅ Notifications admin envoyées avec succès');
+        debugLog('✅ Notifications admin envoyées avec succès');
       } catch (emailError) {
-        print('❌ Erreur lors de l\'envoi des notifications admin: $emailError');
+        debugLog('❌ Erreur lors de l\'envoi des notifications admin: $emailError');
         // Ne pas faire échouer la création du prêt si l'email échoue
       }
 
@@ -154,20 +157,20 @@ class LoanProvider with ChangeNotifier {
 
   /// Charger les prêts d'un utilisateur
   Future<void> loadUserLoans(String userId) async {
-    print('🔍 [DEBUG] Début chargement prêts pour userId: $userId');
+    debugLog('🔍 [DEBUG] Début chargement prêts pour userId: $userId');
     _setLoading(true);
     _clearError();
 
     try {
       _userLoans = await _loanService.getUserLoans(userId);
-      print('🔍 [DEBUG] Prêts chargés: ${_userLoans.length} prêt(s)');
+      debugLog('🔍 [DEBUG] Prêts chargés: ${_userLoans.length} prêt(s)');
       for (final loan in _userLoans) {
-        print(
+        debugLog(
           '🔍 [DEBUG] Prêt: ${loan.id} - Montant: ${loan.montant}€ - Statut: ${loan.statut}',
         );
       }
     } catch (e) {
-      print('❌ [ERROR] Erreur chargement prêts: $e');
+      debugLog('❌ [ERROR] Erreur chargement prêts: $e');
       _errorMessage = e.toString();
     } finally {
       _setLoading(false);
@@ -295,16 +298,16 @@ class LoanProvider with ChangeNotifier {
     required double amount,
     String? note,
   }) async {
-    print('🔍 [LOAN_PROVIDER] Début markPaymentReceived');
-    print('🔍 [LOAN_PROVIDER] scheduleItemId: $scheduleItemId');
-    print('🔍 [LOAN_PROVIDER] adminId: $adminId');
-    print('🔍 [LOAN_PROVIDER] amount: $amount');
+    debugLog('🔍 [LOAN_PROVIDER] Début markPaymentReceived');
+    debugLog('🔍 [LOAN_PROVIDER] scheduleItemId: $scheduleItemId');
+    debugLog('🔍 [LOAN_PROVIDER] adminId: $adminId');
+    debugLog('🔍 [LOAN_PROVIDER] amount: $amount');
 
     _setLoading(true);
     _clearError();
 
     try {
-      print('🔍 [LOAN_PROVIDER] Appel service markPaymentReceived...');
+      debugLog('🔍 [LOAN_PROVIDER] Appel service markPaymentReceived...');
 
       await _loanService.markPaymentReceived(
         scheduleItemId: scheduleItemId,
@@ -313,14 +316,14 @@ class LoanProvider with ChangeNotifier {
         note: note,
       );
 
-      print('✅ [LOAN_PROVIDER] Service markPaymentReceived réussi');
+      debugLog('✅ [LOAN_PROVIDER] Service markPaymentReceived réussi');
 
       // Mettre à jour l'échéancier local
       final index = _currentSchedule.indexWhere(
         (item) => item.id == scheduleItemId,
       );
       if (index != -1) {
-        print('✅ [LOAN_PROVIDER] Mise à jour échéancier local (index: $index)');
+        debugLog('✅ [LOAN_PROVIDER] Mise à jour échéancier local (index: $index)');
         _currentSchedule[index] = _currentSchedule[index].copyWith(
           isPaid: true,
           paidAt: DateTime.now(),
@@ -328,15 +331,15 @@ class LoanProvider with ChangeNotifier {
           noteAdmin: note,
         );
       } else {
-        print(
+        debugLog(
           '⚠️ [LOAN_PROVIDER] Échéance non trouvée dans l\'échéancier local',
         );
       }
 
-      print('✅ [LOAN_PROVIDER] markPaymentReceived terminé avec succès');
+      debugLog('✅ [LOAN_PROVIDER] markPaymentReceived terminé avec succès');
       return true;
     } catch (e) {
-      print('❌ [LOAN_PROVIDER] Erreur markPaymentReceived: $e');
+      debugLog('❌ [LOAN_PROVIDER] Erreur markPaymentReceived: $e');
       _errorMessage = e.toString();
       return false;
     } finally {
@@ -422,7 +425,7 @@ class LoanProvider with ChangeNotifier {
       // Recharger tous les prêts pour voir les changements
       await loadAllLoans();
     } catch (e) {
-      print('Erreur clôture automatique: $e');
+      debugLog('Erreur clôture automatique: $e');
     }
   }
 

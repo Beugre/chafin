@@ -61,3 +61,5 @@ coverage/
 
 # Firebase
 .firebaserc
+firebase-service-account.json
+**/service-account*.json

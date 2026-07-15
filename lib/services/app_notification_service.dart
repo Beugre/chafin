@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/notification_model.dart';
@@ -49,18 +50,18 @@ class AppNotificationService {
 
   /// Récupère les notifications d'un utilisateur
   static Stream<List<NotificationModel>> getUserNotifications(String userId) {
-    print('🔍 [NOTIF DEBUG] Recherche notifications pour userId: $userId');
+    debugLog('🔍 [NOTIF DEBUG] Recherche notifications pour userId: $userId');
     return _firestore
         .collection(_notificationsCollection)
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-          print(
+          debugLog(
             '🔍 [NOTIF DEBUG] Notifications trouvées: ${snapshot.docs.length}',
           );
           for (var doc in snapshot.docs) {
             final data = doc.data();
-            print(
+            debugLog(
               '🔍 [NOTIF DEBUG] Notification: ${data['title']} pour userId: ${data['userId']}',
             );
           }

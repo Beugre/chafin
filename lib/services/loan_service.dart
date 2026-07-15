@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/loan_model.dart';
@@ -28,7 +29,7 @@ class LoanService {
   /// Modifier le taux d'intérêt d'un prêt
   Future<bool> updateInterestRate(String loanId, double newRate) async {
     try {
-      print(
+      debugLog(
         '🔄 Début modification taux - Prêt: $loanId, Nouveau taux: $newRate%',
       );
 
@@ -38,7 +39,7 @@ class LoanService {
       }
 
       final loan = LoanModel.fromJson(loanDoc.data()!);
-      print(
+      debugLog(
         '📋 Prêt trouvé - Statut: ${loan.statut}, Ancien taux: ${loan.tauxAnnuel}%',
       );
 
@@ -56,12 +57,12 @@ class LoanService {
             newRate,
           );
 
-      print(
+      debugLog(
         '💰 Nouveaux calculs - Mensualité: $nouvelleMensualite€, Coût intérêts: $nouveauCoutTotal€',
       );
 
       // Mise à jour du prêt
-      print('💾 Mise à jour du prêt en base...');
+      debugLog('💾 Mise à jour du prêt en base...');
       await _firestore.collection('loans').doc(loanId).update({
         'tauxAnnuel': newRate,
         'mensualite': nouvelleMensualite,
@@ -70,7 +71,7 @@ class LoanService {
       });
 
       // Si le prêt a déjà un échéancier, le recalculer
-      print(
+      debugLog(
         '🔍 Vérification du statut pour échéancier - Statut: ${loan.statut}',
       );
       if (loan.statut == LoanStatus.enCours ||
@@ -78,19 +79,19 @@ class LoanService {
           loan.statut == LoanStatus.enRetard ||
           loan.statut == LoanStatus.approuve ||
           loan.statut == LoanStatus.solde) {
-        print('✅ Régénération de l\'échéancier...');
+        debugLog('✅ Régénération de l\'échéancier...');
         await _regeneratePaymentSchedule(loanId, loan, newRate);
       } else {
-        print('⚠️  Pas de régénération d\'échéancier - Statut: ${loan.statut}');
+        debugLog('⚠️  Pas de régénération d\'échéancier - Statut: ${loan.statut}');
       }
 
       // Notification à l'emprunteur du changement de taux
       await _sendRateChangeNotification(loan, newRate, nouvelleMensualite);
 
-      print('✅ Modification du taux terminée avec succès');
+      debugLog('✅ Modification du taux terminée avec succès');
       return true;
     } catch (e) {
-      print('❌ Erreur lors de la modification du taux: $e');
+      debugLog('❌ Erreur lors de la modification du taux: $e');
       return false;
     }
   }
@@ -102,7 +103,7 @@ class LoanService {
     double newRate,
   ) async {
     try {
-      print('🗑️ Suppression des échéances non payées...');
+      debugLog('🗑️ Suppression des échéances non payées...');
       // Supprimer l'ancien échéancier (seulement les échéances non payées)
       final scheduleQuery = await _firestore
           .collection('schedules')
@@ -110,9 +111,9 @@ class LoanService {
           .where('isPaid', isEqualTo: false)
           .get();
 
-      print('📊 Échéances trouvées à supprimer: ${scheduleQuery.docs.length}');
+      debugLog('📊 Échéances trouvées à supprimer: ${scheduleQuery.docs.length}');
       for (final doc in scheduleQuery.docs) {
-        print('🗑️ Suppression échéance: ${doc.id}');
+        debugLog('🗑️ Suppression échéance: ${doc.id}');
         await doc.reference.delete();
       }
 
@@ -129,11 +130,11 @@ class LoanService {
         mensualite: nouvelleMensualite,
       );
 
-      print('📅 Génération du nouvel échéancier...');
+      debugLog('📅 Génération du nouvel échéancier...');
       await _generateSchedule(updatedLoan);
-      print('✅ Échéancier régénéré avec succès');
+      debugLog('✅ Échéancier régénéré avec succès');
     } catch (e) {
-      print('❌ Erreur lors de la régénération de l\'échéancier: $e');
+      debugLog('❌ Erreur lors de la régénération de l\'échéancier: $e');
     }
   }
 
@@ -172,7 +173,7 @@ class LoanService {
           final userName = userData['nom'] as String? ?? 'Cher client';
 
           if (userEmail != null) {
-            print('📧 Envoi d\'email de modification de taux à: $userEmail');
+            debugLog('📧 Envoi d\'email de modification de taux à: $userEmail');
 
             // Utiliser le calcul exact des intérêts
             final nouveauCoutTotal =
@@ -195,17 +196,17 @@ class LoanService {
                     .toStringAsFixed(0),
               },
             );
-            print('✅ Email de modification de taux envoyé avec succès');
+            debugLog('✅ Email de modification de taux envoyé avec succès');
           } else {
-            print('⚠️ Email utilisateur non trouvé pour l\'envoi d\'email');
+            debugLog('⚠️ Email utilisateur non trouvé pour l\'envoi d\'email');
           }
         }
       } catch (emailError) {
-        print('❌ Erreur lors de l\'envoi d\'email: $emailError');
+        debugLog('❌ Erreur lors de l\'envoi d\'email: $emailError');
         // Ne pas faire échouer la notification si l'email échoue
       }
     } catch (e) {
-      print(
+      debugLog(
         '❌ Erreur lors de l\'envoi de la notification de changement de taux: $e',
       );
     }
@@ -220,6 +221,7 @@ class LoanService {
     required int dureeMois,
     // required String objetPret, // SUPPRIMÉ
     required DateTime dateSouhaitee,
+    String? parrainEmail,
   }) async {
     try {
       // Vérification de la durée maximale
@@ -234,14 +236,14 @@ class LoanService {
         if (userDoc.exists) {
           final userData = userDoc.data()!;
           niveauConfiance = userData['niveauConfiance']?.toDouble();
-          print(
+          debugLog(
             '🔍 [DEBUG] Niveau de confiance récupéré: $niveauConfiance pour user: $userId',
           );
         } else {
-          print('⚠️ [DEBUG] Utilisateur non trouvé: $userId');
+          debugLog('⚠️ [DEBUG] Utilisateur non trouvé: $userId');
         }
       } catch (e) {
-        print('⚠️ Impossible de récupérer le niveau de confiance: $e');
+        debugLog('⚠️ Impossible de récupérer le niveau de confiance: $e');
         // Continue sans niveau de confiance (taux normal)
       }
 
@@ -255,7 +257,7 @@ class LoanService {
         niveauConfiance,
       );
 
-      print(
+      debugLog(
         '🔍 [DEBUG] Calcul taux - Base: $tauxBase%, Avec risque: $tauxAnnuel%, Niveau confiance: $niveauConfiance',
       );
 
@@ -296,9 +298,52 @@ class LoanService {
         datePremierRemboursement: datePremierRemboursement,
         statut: LoanStatus.soumis,
         createdAt: DateTime.now(),
+        parrainEmail: parrainEmail,
       );
 
       await _firestore.collection('loans').doc(loan.id).set(loan.toJson());
+
+      // 🤝 Créer le document de parrainage si parrainEmail est renseigné
+      if (parrainEmail != null && parrainEmail.isNotEmpty) {
+        try {
+          final interetsTotal = coutTotal;
+          final bonusParrain = double.parse(
+            (interetsTotal * 0.20).toStringAsFixed(2),
+          );
+          final referralId = _uuid.v4();
+
+          await _firestore.collection('referrals').doc(referralId).set({
+            'id': referralId,
+            'loanId': loan.id,
+            'parrainEmail': parrainEmail,
+            'filleulUserId': userId,
+            'filleulName': nomEmprunteur,
+            'montantPret': montant,
+            'interetsTotal': interetsTotal,
+            'bonusParrain': bonusParrain,
+            'statut': 'en_attente',
+            'createdAt': FieldValue.serverTimestamp(),
+            'paidAt': null,
+          });
+
+          // 📧 Email 1 : Informer le parrain de la demande
+          await EmailService.sendLoanNotificationEmail(
+            to: parrainEmail,
+            userName: 'Parrain',
+            type: LoanEmailType.referralLoanRequested,
+            loanData: {
+              'filleulName': nomEmprunteur,
+              'amount': montant.toStringAsFixed(0),
+              'duration': dureeMois.toString(),
+            },
+          );
+
+          debugLog('✅ Parrainage créé: $referralId pour prêt ${loan.id}');
+        } catch (e) {
+          debugLog('❌ Erreur création parrainage: $e');
+          // Ne pas faire échouer la création du prêt
+        }
+      }
 
       // Envoyer notifications de demande créée
       try {
@@ -342,7 +387,7 @@ class LoanService {
           );
         }
       } catch (e) {
-        print('Erreur envoi notification: $e');
+        debugLog('Erreur envoi notification: $e');
         // Ne pas faire échouer la création du prêt si la notification échoue
       }
 
@@ -355,29 +400,29 @@ class LoanService {
   /// Récupérer tous les prêts d'un utilisateur
   Future<List<LoanModel>> getUserLoans(String userId) async {
     try {
-      print('🔍 [DEBUG SERVICE] Query Firestore pour userId: $userId');
+      debugLog('🔍 [DEBUG SERVICE] Query Firestore pour userId: $userId');
       final QuerySnapshot snapshot = await _firestore
           .collection('loans')
           .where('userId', isEqualTo: userId)
           .limit(AppConstants.paginationLimit)
           .get();
 
-      print(
+      debugLog(
         '🔍 [DEBUG SERVICE] Snapshot reçu: ${snapshot.docs.length} documents',
       );
 
       final loans = snapshot.docs.map((doc) {
-        print('🔍 [DEBUG SERVICE] Document: ${doc.id} - Data: ${doc.data()}');
+        debugLog('🔍 [DEBUG SERVICE] Document: ${doc.id} - Data: ${doc.data()}');
         return LoanModel.fromJson(doc.data() as Map<String, dynamic>);
       }).toList();
 
       // Trier manuellement par createdAt (descendant)
       loans.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      print('🔍 [DEBUG SERVICE] Loans mappés et triés: ${loans.length} prêts');
+      debugLog('🔍 [DEBUG SERVICE] Loans mappés et triés: ${loans.length} prêts');
       return loans;
     } catch (e) {
-      print('❌ [ERROR SERVICE] Erreur: $e');
+      debugLog('❌ [ERROR SERVICE] Erreur: $e');
       throw Exception('Erreur lors de la récupération des prêts: $e');
     }
   }
@@ -486,10 +531,99 @@ class LoanService {
       // 🔔 ENVOYER NOTIFICATION DE DÉCAISSEMENT
       await _sendDisbursementNotification(updatedLoan);
 
+      // 🤝 Mettre à jour le parrainage si existant + envoyer email 2
+      await _updateReferralOnDisbursement(updatedLoan);
+
       // Enregistrer l'action admin
       await _logAdminAction(adminId, 'MARK_DISBURSED', loanId);
     } catch (e) {
       throw Exception('Erreur lors du marquage du décaissement: $e');
+    }
+  }
+
+  /// 🤝 Mettre à jour le parrainage lors du décaissement
+  Future<void> _updateReferralOnDisbursement(LoanModel loan) async {
+    try {
+      final referralQuery = await _firestore
+          .collection('referrals')
+          .where('loanId', isEqualTo: loan.id)
+          .where('statut', isEqualTo: 'en_attente')
+          .limit(1)
+          .get();
+
+      if (referralQuery.docs.isEmpty) return;
+
+      final referralDoc = referralQuery.docs.first;
+      final referralData = referralDoc.data();
+      final parrainEmail = referralData['parrainEmail'] as String;
+
+      // Recalculer le bonus avec les montants finaux
+      final interetsTotal = loan.coutTotalEstime;
+      final bonusParrain = double.parse(
+        (interetsTotal * 0.20).toStringAsFixed(2),
+      );
+
+      await referralDoc.reference.update({
+        'statut': 'pret_decaisse',
+        'interetsTotal': interetsTotal,
+        'bonusParrain': bonusParrain,
+        'disbursedAt': FieldValue.serverTimestamp(),
+      });
+
+      // 📧 Email 2 : Informer le parrain du décaissement + montant commission
+      await EmailService.sendLoanNotificationEmail(
+        to: parrainEmail,
+        userName: 'Parrain',
+        type: LoanEmailType.referralLoanDisbursed,
+        loanData: {
+          'filleulName': referralData['filleulName'] ?? loan.nomEmprunteur,
+          'amount': loan.montant.toStringAsFixed(0),
+          'interetsTotal': interetsTotal.toStringAsFixed(2),
+          'bonusParrain': bonusParrain.toStringAsFixed(2),
+        },
+      );
+
+      debugLog('✅ Parrainage mis à jour: pret_decaisse pour ${loan.id}');
+    } catch (e) {
+      debugLog('❌ Erreur mise à jour parrainage décaissement: $e');
+    }
+  }
+
+  /// 🤝 Marquer une commission de parrainage comme versée (admin)
+  Future<void> markReferralAsPaid(String referralId) async {
+    try {
+      final referralDoc = await _firestore
+          .collection('referrals')
+          .doc(referralId)
+          .get();
+
+      if (!referralDoc.exists) throw Exception('Parrainage non trouvé');
+
+      final referralData = referralDoc.data()!;
+      final parrainEmail = referralData['parrainEmail'] as String;
+
+      await _firestore.collection('referrals').doc(referralId).update({
+        'statut': 'verse',
+        'paidAt': FieldValue.serverTimestamp(),
+      });
+
+      // 📧 Email 3 : Confirmer le versement de la commission
+      await EmailService.sendLoanNotificationEmail(
+        to: parrainEmail,
+        userName: 'Parrain',
+        type: LoanEmailType.referralCommissionPaid,
+        loanData: {
+          'filleulName': referralData['filleulName'] ?? '',
+          'bonusParrain': (referralData['bonusParrain'] as num).toStringAsFixed(
+            2,
+          ),
+          'paidDate': EmailServiceExtensions.formatDate(DateTime.now()),
+        },
+      );
+
+      debugLog('✅ Commission de parrainage versée: $referralId');
+    } catch (e) {
+      throw Exception('Erreur lors du marquage de la commission: $e');
     }
   }
 
@@ -538,7 +672,7 @@ class LoanService {
     String? note,
   }) async {
     try {
-      print('🔍 [LOAN_SERVICE] Marquage paiement pour: $scheduleItemId');
+      debugLog('🔍 [LOAN_SERVICE] Marquage paiement pour: $scheduleItemId');
 
       // Extraire le loanId et le numéro d'échéance du scheduleItemId (format: loanId_numeroEcheance)
       final parts = scheduleItemId.split('_');
@@ -552,7 +686,7 @@ class LoanService {
       bool updated = false;
 
       if (numero != null) {
-        print(
+        debugLog(
           '🔍 [LOAN_SERVICE] Recherche schedule avec loanId=$loanId et numero=$numero',
         );
         final querySnapshot = await _firestore
@@ -564,7 +698,7 @@ class LoanService {
 
         if (querySnapshot.docs.isNotEmpty) {
           final realDoc = querySnapshot.docs.first;
-          print(
+          debugLog(
             '✅ [LOAN_SERVICE] Vrai document trouvé (${realDoc.id}), mise à jour...',
           );
           await realDoc.reference.update({
@@ -584,7 +718,7 @@ class LoanService {
         final docSnapshot = await docRef.get();
 
         if (docSnapshot.exists) {
-          print(
+          debugLog(
             '✅ [LOAN_SERVICE] Document trouvé par ID direct, mise à jour...',
           );
           await docRef.update({
@@ -599,11 +733,11 @@ class LoanService {
       }
 
       if (!updated) {
-        print('⚠️ [LOAN_SERVICE] Aucun document trouvé pour $scheduleItemId');
+        debugLog('⚠️ [LOAN_SERVICE] Aucun document trouvé pour $scheduleItemId');
         throw Exception('Échéance non trouvée: $scheduleItemId');
       }
 
-      print('✅ [LOAN_SERVICE] Paiement marqué avec succès');
+      debugLog('✅ [LOAN_SERVICE] Paiement marqué avec succès');
 
       // 🔔 ENVOYER NOTIFICATION DE PAIEMENT REÇU
       await _sendPaymentReceivedNotification(loanId, amount, scheduleItemId);
@@ -611,16 +745,16 @@ class LoanService {
       // Enregistrer l'action admin
       await _logAdminAction(adminId, 'MARK_PAYMENT', scheduleItemId);
 
-      print('✅ [LOAN_SERVICE] Action admin enregistrée');
+      debugLog('✅ [LOAN_SERVICE] Action admin enregistrée');
     } catch (e) {
-      print('❌ [LOAN_SERVICE] Erreur marquage: $e');
+      debugLog('❌ [LOAN_SERVICE] Erreur marquage: $e');
       throw Exception('Erreur lors du marquage du paiement: $e');
     }
   }
 
   /// Générer l'échéancier pour un prêt approuvé
   Future<void> _generateSchedule(LoanModel loan) async {
-    print(
+    debugLog(
       '📅 Génération échéancier - Prêt: ${loan.id}, Taux: ${loan.tauxAnnuel}%, Mensualité: ${loan.mensualite}€',
     );
 
@@ -633,17 +767,17 @@ class LoanService {
       datePremierePaiement: loan.dateSouhaitee,
     );
 
-    print('📊 Échéancier généré - ${schedule.length} échéances');
+    debugLog('📊 Échéancier généré - ${schedule.length} échéances');
 
     final batch = _firestore.batch();
     for (final item in schedule) {
-      print(
+      debugLog(
         '💾 Sauvegarde échéance ${item.numero}: ${item.total}€ (capital: ${item.principal}€, intérêts: ${item.interet}€)',
       );
       batch.set(_firestore.collection('schedules').doc(item.id), item.toJson());
     }
     await batch.commit();
-    print('✅ Échéancier sauvegardé en base');
+    debugLog('✅ Échéancier sauvegardé en base');
   }
 
   /// Annuler un prêt accepté (emprunteur ou admin)
@@ -740,7 +874,7 @@ class LoanService {
 
       return true;
     } catch (e) {
-      print('Erreur vérification paiement complet: $e');
+      debugLog('Erreur vérification paiement complet: $e');
       return false;
     }
   }
@@ -793,7 +927,7 @@ class LoanService {
         );
       }
     } catch (e) {
-      print('Erreur envoi notification approbation: $e');
+      debugLog('Erreur envoi notification approbation: $e');
     }
   }
 
@@ -836,7 +970,7 @@ class LoanService {
         );
       }
     } catch (e) {
-      print('Erreur envoi notification rejet: $e');
+      debugLog('Erreur envoi notification rejet: $e');
     }
   }
 
@@ -891,7 +1025,7 @@ class LoanService {
         );
       }
     } catch (e) {
-      print('Erreur envoi notification décaissement: $e');
+      debugLog('Erreur envoi notification décaissement: $e');
     }
   }
 
@@ -931,7 +1065,7 @@ class LoanService {
           final userName = userData['nom'] as String? ?? 'Cher client';
 
           if (userEmail != null) {
-            print(
+            debugLog(
               '📧 Envoi d\'email de confirmation de paiement à: $userEmail',
             );
 
@@ -951,15 +1085,15 @@ class LoanService {
                 'loanId': loan.id,
               },
             );
-            print('✅ Email de confirmation de paiement envoyé avec succès');
+            debugLog('✅ Email de confirmation de paiement envoyé avec succès');
           }
         }
       } catch (emailError) {
-        print('❌ Erreur lors de l\'envoi d\'email: $emailError');
+        debugLog('❌ Erreur lors de l\'envoi d\'email: $emailError');
         // Ne pas faire échouer la notification si l'email échoue
       }
     } catch (e) {
-      print('Erreur envoi notification paiement reçu: $e');
+      debugLog('Erreur envoi notification paiement reçu: $e');
     }
   }
 
@@ -981,7 +1115,7 @@ class LoanService {
         },
       );
     } catch (e) {
-      print('Erreur envoi notification annulation: $e');
+      debugLog('Erreur envoi notification annulation: $e');
     }
   }
 
@@ -1001,7 +1135,7 @@ class LoanService {
         },
       );
     } catch (e) {
-      print('Erreur envoi notification clôture: $e');
+      debugLog('Erreur envoi notification clôture: $e');
     }
   }
 

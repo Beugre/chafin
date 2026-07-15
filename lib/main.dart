@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'providers/auth_provider.dart';
 import 'providers/loan_provider.dart';
 import 'providers/admin_provider.dart';
@@ -14,59 +16,43 @@ import 'services/safe_notification_service.dart';
 import 'services/loan_maintenance_service.dart';
 
 void main() async {
-  print('🚀 DEBUT main() - Application Chafin Loans');
+  if (kDebugMode) debugPrint('🚀 DEBUT main() - Application Chafin Loans');
 
   try {
-    print('🔧 WidgetsFlutterBinding.ensureInitialized()...');
     WidgetsFlutterBinding.ensureInitialized();
-    print('✅ WidgetsFlutterBinding initialisé');
+    await initializeDateFormatting('fr_FR', null);
 
     // Initialisation Firebase
-    print('🔥 Initialisation de Firebase...');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    print('✅ Firebase initialisé avec succès');
+    if (kDebugMode) debugPrint('✅ Firebase initialisé avec succès');
+
+    // Activer la persistence Firestore (cache hors-ligne)
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
 
     // Initialisation des notifications (uniquement mobile)
     if (!kIsWeb) {
-      print('🔔 Initialisation des notifications...');
       try {
-        final success = await SafeNotificationService.initialize();
-        if (success) {
-          print('✅ Notifications initialisées avec succès');
-        } else {
-          print('⚠️ Notifications initialisées avec fallback (mode dégradé)');
-        }
+        await SafeNotificationService.initialize();
       } catch (e) {
-        print('⚠️ Erreur notifications (non critique): $e');
-        // L'app continue sans notifications
+        if (kDebugMode) debugPrint('⚠️ Erreur notifications (non critique): $e');
       }
-    } else {
-      print('🌐 Web détecté - notifications ignorées');
     }
 
-    // Affichage de la configuration
-    print('⚙️ Affichage configuration...');
+    // Configuration et maintenance
     AppEnvironment.printConfiguration();
-    print('✅ Configuration affichée');
-
-    // Démarrage de la maintenance automatique des prêts
-    print('🔧 Démarrage de la maintenance automatique...');
     LoanMaintenanceService.startAutoMaintenance();
-    print('✅ Maintenance automatique démarrée');
 
-    // Rappels + pénalités gérés UNIQUEMENT par Cloud Functions (dailyPaymentReminders)
-    print(
-      'ℹ️ Rappels d\'échéances gérés par Cloud Functions (pas de doublon client)',
-    );
-
-    print('🚀 Lancement de MyApp()...');
     runApp(const MyApp());
-    print('✅ runApp() appelé avec succès');
   } catch (e, stackTrace) {
-    print('❌ ERREUR FATALE dans main(): $e');
-    print('📍 StackTrace: $stackTrace');
+    if (kDebugMode) {
+      debugPrint('❌ ERREUR FATALE dans main(): $e');
+      debugPrint('📍 StackTrace: $stackTrace');
+    }
     runApp(ErrorApp(error: 'Erreur main(): $e\n\nStackTrace:\n$stackTrace'));
   }
 }
@@ -101,53 +87,30 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('🏗️ DEBUT MyApp.build()...');
-
     try {
-      print('📦 Création des providers...');
       return MultiProvider(
         providers: [
           ChangeNotifierProvider(
             create: (_) {
-              print('🔐 Initialisation AuthProvider...');
               final authProvider = AuthProvider();
-              print('🔐 AuthProvider créé, lancement init()...');
-              // L'initialisation est maintenant asynchrone mais n'est pas bloquante
               authProvider
                   .init()
                   .then((_) {
-                    print('🔐 AuthProvider.init() terminé avec succès');
+                    if (kDebugMode) debugPrint('🔐 AuthProvider.init() terminé');
                   })
                   .catchError((e) {
-                    print('❌ Erreur AuthProvider.init(): $e');
+                    if (kDebugMode) debugPrint('❌ Erreur AuthProvider.init(): $e');
                   });
               return authProvider;
             },
           ),
-          ChangeNotifierProvider(
-            create: (_) {
-              print('💰 Initialisation LoanProvider...');
-              return LoanProvider();
-            },
-          ),
-          ChangeNotifierProvider(
-            create: (_) {
-              print('👑 Initialisation AdminProvider...');
-              return AdminProvider();
-            },
-          ),
-          ChangeNotifierProvider(
-            create: (_) {
-              print('👤 Initialisation BorrowerProvider...');
-              return BorrowerProvider();
-            },
-          ),
+          ChangeNotifierProvider(create: (_) => LoanProvider()),
+          ChangeNotifierProvider(create: (_) => AdminProvider()),
+          ChangeNotifierProvider(create: (_) => BorrowerProvider()),
         ],
         child: Consumer<AuthProvider>(
           builder: (context, authProvider, _) {
-            print('🎨 Construction MaterialApp avec état auth...');
-
-            // Afficher un écran de chargement pendant l'initialisation
+            // Écran de chargement pendant l'initialisation
             if (authProvider.isInitializing) {
               return MaterialApp(
                 title: 'Chafin Loans',
@@ -192,16 +155,9 @@ class MyApp extends StatelessWidget {
                 debugShowCheckedModeBanner: false,
                 theme: AppTheme.lightTheme,
                 routerConfig: AppRouter.router,
-                builder: (context, child) {
-                  print(
-                    '🎨 Builder MaterialApp appelé avec child: ${child.runtimeType}',
-                  );
-                  return child!;
-                },
               );
             } catch (e, stackTrace) {
-              print('❌ ERREUR dans MaterialApp.router: $e');
-              print('📍 StackTrace: $stackTrace');
+              if (kDebugMode) debugPrint('❌ ERREUR MaterialApp.router: $e');
               return MaterialApp(
                 home: Scaffold(
                   body: Center(
@@ -223,8 +179,7 @@ class MyApp extends StatelessWidget {
         ),
       );
     } catch (e, stackTrace) {
-      print('❌ ERREUR FATALE dans MyApp.build(): $e');
-      print('📍 StackTrace: $stackTrace');
+      if (kDebugMode) debugPrint('❌ ERREUR FATALE MyApp.build(): $e');
       return MaterialApp(
         home: Scaffold(
           body: Center(

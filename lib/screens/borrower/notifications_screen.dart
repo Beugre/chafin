@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/notification_model.dart';
 import '../../services/app_notification_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../config/app_theme.dart';
 
 /// Écran d'affichage des notifications
 class BorrowerNotificationsScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class _BorrowerNotificationsScreenState
 
     if (currentUser == null) {
       return Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: AppTheme.backgroundColor,
         body: const Center(
           child: Text('Veuillez vous connecter pour voir vos notifications'),
         ),
@@ -30,7 +31,7 @@ class _BorrowerNotificationsScreenState
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -43,9 +44,9 @@ class _BorrowerNotificationsScreenState
                   const Text(
                     'Notifications',
                     style: TextStyle(
-                      fontSize: 32,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: AppTheme.textPrimaryColor,
                     ),
                   ),
                   Container(
@@ -70,7 +71,7 @@ class _BorrowerNotificationsScreenState
                           padding: EdgeInsets.all(12),
                           child: Icon(
                             Icons.done_all,
-                            color: Colors.blue,
+                            color: AppTheme.primaryColor,
                             size: 24,
                           ),
                         ),
@@ -135,7 +136,7 @@ class _BorrowerNotificationsScreenState
                                 Icon(
                                   Icons.notifications_none_outlined,
                                   size: 64,
-                                  color: Colors.grey.shade400,
+                                  color: AppTheme.textHintColor,
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
@@ -143,7 +144,7 @@ class _BorrowerNotificationsScreenState
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
+                                    color: AppTheme.textPrimaryColor,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -152,7 +153,7 @@ class _BorrowerNotificationsScreenState
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey.shade500,
+                                    color: AppTheme.textSecondaryColor,
                                   ),
                                 ),
                               ],
@@ -190,7 +191,10 @@ class _BorrowerNotificationsScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: isUnread
-            ? Border.all(color: Colors.blue.withOpacity(0.3), width: 1)
+            ? Border.all(
+                color: AppTheme.primaryColor.withOpacity(0.3),
+                width: 1,
+              )
             : null,
         boxShadow: [
           BoxShadow(
@@ -241,7 +245,7 @@ class _BorrowerNotificationsScreenState
                                 fontWeight: isUnread
                                     ? FontWeight.w600
                                     : FontWeight.w500,
-                                color: Colors.black87,
+                                color: AppTheme.textPrimaryColor,
                               ),
                             ),
                           ),
@@ -250,7 +254,7 @@ class _BorrowerNotificationsScreenState
                               width: 8,
                               height: 8,
                               decoration: const BoxDecoration(
-                                color: Colors.blue,
+                                color: AppTheme.primaryColor,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -261,16 +265,16 @@ class _BorrowerNotificationsScreenState
                         notification.body,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: AppTheme.textSecondaryColor,
                           height: 1.4,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         _formatDate(notification.createdAt),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: AppTheme.textHintColor,
                         ),
                       ),
                     ],

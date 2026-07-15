@@ -10,18 +10,23 @@ Application Flutter de prêts entre particuliers avec Firebase, incluant :
 - Interface admin pour validation et suivi des prêts
 
 ## Règles de calcul importantes
-### Taux de base par montant :
-- 10% pour 10€ ≤ montant ≤ 2 000€
-- 5% pour 2 001€ ≤ montant ≤ 10 000€
-- 2,5% pour montant > 10 000€
+### Taux d'intérêt selon la durée (règle en vigueur) :
+- 1 mois (remboursement en une fois) → 5%
+- 2 à 4 mensualités → 10%
+- 5 à 6 mensualités → 15%
 
-### Coefficient de durée :
-- ≤ 12 mois → coefficient 1,0
-- 12 < durée < 24 mois → coefficient 1,5
-- ≥ 24 mois → coefficient 2,0
+### Durée autorisée :
+- Minimum : 1 mois
+- Maximum : 6 mois
 
-### Formule finale :
-`taux_effectif_annuel = taux_base(montant) × coefficient_durée(durée)`
+### Niveau de confiance (multiplicateur de risque) :
+- 4-5/5 (faible risque) → taux ÷ 2
+- 2-3/5 (normal) → taux inchangé
+- 1/5 (gros risque) → taux × 2
+
+### Formule :
+`taux_effectif = taux_duree(dureeMois) × multiplicateur_risque(niveauConfiance)`
+`mensualité = (capital + capital × taux_effectif / 100) / dureeMois`
 
 ## Architecture
 - Utilise Provider pour la gestion d'état

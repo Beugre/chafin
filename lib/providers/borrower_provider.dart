@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:flutter/material.dart';
 import '../models/loan_model.dart';
 import '../models/repayment_model.dart';
@@ -44,8 +45,8 @@ class BorrowerProvider with ChangeNotifier {
       _setLoading(true);
       _error = null;
 
-      print('=== BorrowerProvider.loadUserData ===');
-      print('Chargement données pour user: $userId');
+      debugLog('=== BorrowerProvider.loadUserData ===');
+      debugLog('Chargement données pour user: $userId');
 
       // Charger en parallèle
       final futures = await Future.wait([
@@ -58,14 +59,14 @@ class BorrowerProvider with ChangeNotifier {
       _userRepayments = futures[1] as List<RepaymentModel>;
       _loansSummary = futures[2] as Map<String, dynamic>;
 
-      print('Données chargées:');
-      print('- Prêts: ${_userLoans.length}');
-      print('- Remboursements: ${_userRepayments.length}');
-      print('- Résumé: $_loansSummary');
+      debugLog('Données chargées:');
+      debugLog('- Prêts: ${_userLoans.length}');
+      debugLog('- Remboursements: ${_userRepayments.length}');
+      debugLog('- Résumé: $_loansSummary');
 
       notifyListeners();
     } catch (e) {
-      print('Erreur chargement données utilisateur: $e');
+      debugLog('Erreur chargement données utilisateur: $e');
       _error = e.toString();
       notifyListeners();
     } finally {
@@ -83,7 +84,7 @@ class BorrowerProvider with ChangeNotifier {
     try {
       return await _borrowerService.getLoanDetails(loanId, userId);
     } catch (e) {
-      print('Erreur récupération détail prêt: $e');
+      debugLog('Erreur récupération détail prêt: $e');
       _error = e.toString();
       notifyListeners();
       return null;
@@ -95,7 +96,7 @@ class BorrowerProvider with ChangeNotifier {
     try {
       return await _borrowerService.getLoanRepayments(loanId);
     } catch (e) {
-      print('Erreur récupération échéancier prêt: $e');
+      debugLog('Erreur récupération échéancier prêt: $e');
       _error = e.toString();
       notifyListeners();
       return [];

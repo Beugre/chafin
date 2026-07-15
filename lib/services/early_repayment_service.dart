@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/loan_model.dart';
 import '../models/payment_schedule_model.dart';
@@ -12,33 +13,33 @@ class EarlyRepaymentService {
     required double montantAnticipe,
     required int nouvelleDuree,
   }) {
-    print('=== CALCUL REMBOURSEMENT ANTICIPÉ ===');
-    print('Prêt original:');
-    print('- Montant: ${loan.montant}€');
-    print('- Durée: ${loan.dureeMois} mois');
-    print('- Taux: ${loan.tauxAnnuel}%');
-    print('- Mensualité: ${loan.mensualite}€');
-    print('- Intérêts totaux: ${loan.coutTotalEstime}€');
+    debugLog('=== CALCUL REMBOURSEMENT ANTICIPÉ ===');
+    debugLog('Prêt original:');
+    debugLog('- Montant: ${loan.montant}€');
+    debugLog('- Durée: ${loan.dureeMois} mois');
+    debugLog('- Taux: ${loan.tauxAnnuel}%');
+    debugLog('- Mensualité: ${loan.mensualite}€');
+    debugLog('- Intérêts totaux: ${loan.coutTotalEstime}€');
 
     // coutTotalEstime est déjà le montant des intérêts totaux
     final interetsOriginaux = loan.coutTotalEstime;
-    print('- Intérêts originaux: ${interetsOriginaux}€');
+    debugLog('- Intérêts originaux: ${interetsOriginaux}€');
 
-    print('\nRemboursement anticipé:');
-    print('- Montant anticipé: ${montantAnticipe}€');
-    print('- Nouvelle durée: ${nouvelleDuree} mois');
+    debugLog('\nRemboursement anticipé:');
+    debugLog('- Montant anticipé: ${montantAnticipe}€');
+    debugLog('- Nouvelle durée: ${nouvelleDuree} mois');
 
     // Le capital restant après le remboursement anticipé
     final capitalRestant = loan.montant - montantAnticipe;
-    print('- Capital restant: ${capitalRestant}€');
+    debugLog('- Capital restant: ${capitalRestant}€');
 
     // RÈGLE MÉTIER : Garder le même montant d'intérêts total
     // mais le répartir sur la nouvelle durée
     final montantTotalAvecInterets = capitalRestant + interetsOriginaux;
     final nouvelleMensualite = montantTotalAvecInterets / nouvelleDuree;
 
-    print('- Montant total avec intérêts: ${montantTotalAvecInterets}€');
-    print('- Nouvelle mensualité: ${nouvelleMensualite}€');
+    debugLog('- Montant total avec intérêts: ${montantTotalAvecInterets}€');
+    debugLog('- Nouvelle mensualité: ${nouvelleMensualite}€');
 
     return EarlyRepaymentOptions(
       montantAnticipe: montantAnticipe,
@@ -59,15 +60,15 @@ class EarlyRepaymentService {
     required EarlyRepaymentOptions options,
     required DateTime dateRemboursement,
   }) {
-    print('=== GÉNÉRATION NOUVEL ÉCHÉANCIER ===');
+    debugLog('=== GÉNÉRATION NOUVEL ÉCHÉANCIER ===');
 
     final List<PaymentScheduleItem> nouvelEcheancier = [];
     final interetsParMois = options.interetsConserves / options.nouvelleDuree;
     final capitalParMois = options.capitalRestant / options.nouvelleDuree;
 
-    print('Répartition mensuelle:');
-    print('- Capital par mois: ${capitalParMois}€');
-    print('- Intérêts par mois: ${interetsParMois}€');
+    debugLog('Répartition mensuelle:');
+    debugLog('- Capital par mois: ${capitalParMois}€');
+    debugLog('- Intérêts par mois: ${interetsParMois}€');
 
     double capitalRestantDu = options.capitalRestant;
 
@@ -99,7 +100,7 @@ class EarlyRepaymentService {
       );
     }
 
-    print('Nouvel échéancier généré: ${nouvelEcheancier.length} échéances');
+    debugLog('Nouvel échéancier généré: ${nouvelEcheancier.length} échéances');
     return nouvelEcheancier;
   }
 
@@ -112,10 +113,10 @@ class EarlyRepaymentService {
     String? noteUtilisateur,
   }) async {
     try {
-      print('=== TRAITEMENT REMBOURSEMENT ANTICIPÉ ===');
-      print('Prêt ID: $loanId');
-      print('Montant anticipé: ${montantAnticipe}€');
-      print('Nouvelle durée: $nouvelleDuree mois');
+      debugLog('=== TRAITEMENT REMBOURSEMENT ANTICIPÉ ===');
+      debugLog('Prêt ID: $loanId');
+      debugLog('Montant anticipé: ${montantAnticipe}€');
+      debugLog('Nouvelle durée: $nouvelleDuree mois');
 
       // Récupérer le prêt actuel
       final loanDoc = await _firestore.collection('loans').doc(loanId).get();
@@ -215,10 +216,10 @@ class EarlyRepaymentService {
         });
       });
 
-      print('Remboursement anticipé traité avec succès');
+      debugLog('Remboursement anticipé traité avec succès');
       return true;
     } catch (e) {
-      print('Erreur lors du remboursement anticipé: $e');
+      debugLog('Erreur lors du remboursement anticipé: $e');
       return false;
     }
   }
@@ -238,7 +239,7 @@ class EarlyRepaymentService {
           .map((doc) => {'id': doc.id, ...doc.data()})
           .toList();
     } catch (e) {
-      print('Erreur lors de la récupération de l\'historique: $e');
+      debugLog('Erreur lors de la récupération de l\'historique: $e');
       return [];
     }
   }

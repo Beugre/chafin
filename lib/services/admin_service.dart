@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
@@ -24,8 +25,8 @@ class AdminService {
     required UserRole role,
   }) async {
     try {
-      print('=== AdminService.createAdminAccount ===');
-      print('Email: $email, Rôle: $role');
+      debugLog('=== AdminService.createAdminAccount ===');
+      debugLog('Email: $email, Rôle: $role');
 
       // Créer l'utilisateur dans Firebase Auth
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
@@ -33,7 +34,7 @@ class AdminService {
         password: password,
       );
 
-      print('Firebase Auth créé: ${result.user?.uid}');
+      debugLog('Firebase Auth créé: ${result.user?.uid}');
 
       if (result.user != null) {
         final user = UserModel(
@@ -53,13 +54,13 @@ class AdminService {
             .doc(result.user!.uid)
             .set(user.toJson());
 
-        print('Compte admin créé avec succès');
+        debugLog('Compte admin créé avec succès');
         return user;
       } else {
         throw Exception('Erreur lors de la création du compte Firebase');
       }
     } catch (e) {
-      print('Erreur création admin: $e');
+      debugLog('Erreur création admin: $e');
       throw Exception('Erreur lors de la création du compte admin: $e');
     }
   }
@@ -67,23 +68,22 @@ class AdminService {
   /// Récupérer tous les prêts (pour admin)
   Future<List<LoanModel>> getAllLoans() async {
     try {
-      print('=== AdminService.getAllLoans ===');
+      debugLog('=== AdminService.getAllLoans ===');
 
       final QuerySnapshot snapshot = await _firestore
           .collection('loans')
           .orderBy('createdAt', descending: true)
-          .limit(100)
           .get();
 
       final loans = snapshot.docs
           .map((doc) => LoanModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
-      print('Total prêts récupérés: ${loans.length}');
+      debugLog('Total prêts récupérés: ${loans.length}');
 
       return loans;
     } catch (e) {
-      print('Erreur récupération prêts: $e');
+      debugLog('Erreur récupération prêts: $e');
       throw Exception('Erreur lors de la récupération des prêts: $e');
     }
   }
@@ -91,8 +91,8 @@ class AdminService {
   /// Récupérer les prêts par statut
   Future<List<LoanModel>> getLoansByStatus(LoanStatus status) async {
     try {
-      print('=== AdminService.getLoansByStatus ===');
-      print('Statut recherché: $status');
+      debugLog('=== AdminService.getLoansByStatus ===');
+      debugLog('Statut recherché: $status');
 
       final QuerySnapshot snapshot = await _firestore
           .collection('loans')
@@ -103,14 +103,14 @@ class AdminService {
           .map((doc) => LoanModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
-      print('Prêts trouvés avec statut $status: ${loans.length}');
+      debugLog('Prêts trouvés avec statut $status: ${loans.length}');
 
       // Trier par date de création
       loans.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       return loans;
     } catch (e) {
-      print('Erreur récupération prêts par statut: $e');
+      debugLog('Erreur récupération prêts par statut: $e');
       throw Exception('Erreur lors de la récupération des prêts: $e');
     }
   }
@@ -118,8 +118,8 @@ class AdminService {
   /// Approuver un prêt
   Future<void> approveLoan(String loanId) async {
     try {
-      print('=== AdminService.approveLoan ===');
-      print('ID prêt: $loanId');
+      debugLog('=== AdminService.approveLoan ===');
+      debugLog('ID prêt: $loanId');
 
       // Récupérer les détails du prêt avant mise à jour
       final loanDoc = await _firestore.collection('loans').doc(loanId).get();
@@ -135,7 +135,7 @@ class AdminService {
         'approvedAt': FieldValue.serverTimestamp(),
       });
 
-      print('Prêt approuvé avec succès');
+      debugLog('Prêt approuvé avec succès');
 
       // ✨ NOUVEAU : Envoi d'email d'approbation
       try {
@@ -150,7 +150,7 @@ class AdminService {
           final userName = userData['nom'] as String? ?? 'Cher client';
 
           if (userEmail != null) {
-            print('📧 Envoi d\'email d\'approbation à: $userEmail');
+            debugLog('📧 Envoi d\'email d\'approbation à: $userEmail');
 
             await EmailService.sendLoanNotificationEmail(
               to: userEmail,
@@ -165,15 +165,15 @@ class AdminService {
                 )[0],
               },
             );
-            print('✅ Email d\'approbation envoyé avec succès');
+            debugLog('✅ Email d\'approbation envoyé avec succès');
           }
         }
       } catch (emailError) {
-        print('❌ Erreur lors de l\'envoi d\'email d\'approbation: $emailError');
+        debugLog('❌ Erreur lors de l\'envoi d\'email d\'approbation: $emailError');
         // Ne pas faire échouer l'approbation si l'email échoue
       }
     } catch (e) {
-      print('Erreur approbation prêt: $e');
+      debugLog('Erreur approbation prêt: $e');
       throw Exception('Erreur lors de l\'approbation du prêt: $e');
     }
   }
@@ -181,8 +181,8 @@ class AdminService {
   /// Rejeter un prêt
   Future<void> rejectLoan(String loanId, String reason) async {
     try {
-      print('=== AdminService.rejectLoan ===');
-      print('ID prêt: $loanId, Raison: $reason');
+      debugLog('=== AdminService.rejectLoan ===');
+      debugLog('ID prêt: $loanId, Raison: $reason');
 
       // Récupérer les détails du prêt avant mise à jour
       final loanDoc = await _firestore.collection('loans').doc(loanId).get();
@@ -199,7 +199,7 @@ class AdminService {
         'rejectionReason': reason,
       });
 
-      print('Prêt rejeté avec succès');
+      debugLog('Prêt rejeté avec succès');
 
       // ✨ NOUVEAU : Envoi d'email de refus
       try {
@@ -214,7 +214,7 @@ class AdminService {
           final userName = userData['nom'] as String? ?? 'Cher client';
 
           if (userEmail != null) {
-            print('📧 Envoi d\'email de refus à: $userEmail');
+            debugLog('📧 Envoi d\'email de refus à: $userEmail');
 
             await EmailService.sendLoanNotificationEmail(
               to: userEmail,
@@ -226,15 +226,15 @@ class AdminService {
                 'reason': reason,
               },
             );
-            print('✅ Email de refus envoyé avec succès');
+            debugLog('✅ Email de refus envoyé avec succès');
           }
         }
       } catch (emailError) {
-        print('❌ Erreur lors de l\'envoi d\'email de refus: $emailError');
+        debugLog('❌ Erreur lors de l\'envoi d\'email de refus: $emailError');
         // Ne pas faire échouer le refus si l'email échoue
       }
     } catch (e) {
-      print('Erreur rejet prêt: $e');
+      debugLog('Erreur rejet prêt: $e');
       throw Exception('Erreur lors du rejet du prêt: $e');
     }
   }
@@ -242,7 +242,7 @@ class AdminService {
   /// Récupérer tous les utilisateurs
   Future<List<UserModel>> getAllUsers() async {
     try {
-      print('=== AdminService.getAllUsers ===');
+      debugLog('=== AdminService.getAllUsers ===');
 
       final QuerySnapshot snapshot = await _firestore.collection('users').get();
 
@@ -250,14 +250,14 @@ class AdminService {
           .map((doc) => UserModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
 
-      print('Total utilisateurs: ${users.length}');
+      debugLog('Total utilisateurs: ${users.length}');
 
       // Trier par date de création
       users.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       return users;
     } catch (e) {
-      print('Erreur récupération utilisateurs: $e');
+      debugLog('Erreur récupération utilisateurs: $e');
       throw Exception('Erreur lors de la récupération des utilisateurs: $e');
     }
   }
@@ -265,7 +265,7 @@ class AdminService {
   /// Récupérer les statistiques globales
   Future<Map<String, dynamic>> getGlobalStats() async {
     try {
-      print('=== AdminService.getGlobalStats ===');
+      debugLog('=== AdminService.getGlobalStats ===');
 
       // Récupérer tous les prêts avec gestion d'erreur
       final loansSnapshot = await _firestore.collection('loans').get();
@@ -273,15 +273,15 @@ class AdminService {
 
       for (var doc in loansSnapshot.docs) {
         try {
-          print('📄 Traitement loan document: ${doc.id}');
-          print('📊 Données brutes: ${doc.data()}');
+          debugLog('📄 Traitement loan document: ${doc.id}');
+          debugLog('📊 Données brutes: ${doc.data()}');
 
           final loan = LoanModel.fromJson(doc.data());
           loans.add(loan);
-          print('✅ Loan ajouté: ${loan.id}');
+          debugLog('✅ Loan ajouté: ${loan.id}');
         } catch (e) {
-          print('❌ Erreur lors du parsing du loan ${doc.id}: $e');
-          print('📄 Données problématiques: ${doc.data()}');
+          debugLog('❌ Erreur lors du parsing du loan ${doc.id}: $e');
+          debugLog('📄 Données problématiques: ${doc.data()}');
           // Continue avec les autres documents
         }
       }
@@ -292,36 +292,36 @@ class AdminService {
 
       for (var doc in usersSnapshot.docs) {
         try {
-          print('📄 Traitement user document: ${doc.id}');
+          debugLog('📄 Traitement user document: ${doc.id}');
           final rawData = doc.data();
-          print('📊 Données brutes: $rawData');
+          debugLog('📊 Données brutes: $rawData');
 
           // Vérifier chaque champ individuellement
-          print('🔍 Vérification champs:');
-          print('  - id: ${rawData['id']} (${rawData['id'].runtimeType})');
-          print('  - nom: ${rawData['nom']} (${rawData['nom'].runtimeType})');
-          print(
+          debugLog('🔍 Vérification champs:');
+          debugLog('  - id: ${rawData['id']} (${rawData['id'].runtimeType})');
+          debugLog('  - nom: ${rawData['nom']} (${rawData['nom'].runtimeType})');
+          debugLog(
             '  - email: ${rawData['email']} (${rawData['email'].runtimeType})',
           );
-          print(
+          debugLog(
             '  - telephone: ${rawData['telephone']} (${rawData['telephone'].runtimeType})',
           );
-          print(
+          debugLog(
             '  - adresse: ${rawData['adresse']} (${rawData['adresse'].runtimeType})',
           );
-          print(
+          debugLog(
             '  - role: ${rawData['role']} (${rawData['role'].runtimeType})',
           );
-          print(
+          debugLog(
             '  - createdAt: ${rawData['createdAt']} (${rawData['createdAt'].runtimeType})',
           );
 
           final user = UserModel.fromJson(rawData);
           users.add(user);
-          print('✅ User ajouté: ${user.nom} - ${user.role}');
+          debugLog('✅ User ajouté: ${user.nom} - ${user.role}');
         } catch (e) {
-          print('❌ Erreur lors du parsing du user ${doc.id}: $e');
-          print('📄 Données problématiques: ${doc.data()}');
+          debugLog('❌ Erreur lors du parsing du user ${doc.id}: $e');
+          debugLog('📄 Données problématiques: ${doc.data()}');
           // Continue avec les autres documents
         }
       }
@@ -351,10 +351,10 @@ class AdminService {
             .length,
       };
 
-      print('Statistiques calculées: $stats');
+      debugLog('Statistiques calculées: $stats');
       return stats;
     } catch (e) {
-      print('Erreur calcul statistiques: $e');
+      debugLog('Erreur calcul statistiques: $e');
       throw Exception('Erreur lors du calcul des statistiques: $e');
     }
   }
@@ -372,7 +372,7 @@ class AdminService {
       }
       return null;
     } catch (e) {
-      print('Erreur récupération utilisateur: $e');
+      debugLog('Erreur récupération utilisateur: $e');
       throw Exception('Erreur lors de la récupération de l\'utilisateur: $e');
     }
   }
@@ -384,8 +384,8 @@ class AdminService {
     String? noteAdmin,
   }) async {
     try {
-      print('=== AdminService.confirmLoanDisbursement ===');
-      print('Prêt ID: $loanId, Référence: $referenceDecaissement');
+      debugLog('=== AdminService.confirmLoanDisbursement ===');
+      debugLog('Prêt ID: $loanId, Référence: $referenceDecaissement');
 
       // Récupérer le prêt avant mise à jour pour l'email
       final loanDoc = await _firestore.collection('loans').doc(loanId).get();
@@ -417,7 +417,7 @@ class AdminService {
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      print('Décaissement confirmé et échéancier généré');
+      debugLog('Décaissement confirmé et échéancier généré');
 
       // ✨ NOUVEAU : Envoi d'email de décaissement
       try {
@@ -432,7 +432,7 @@ class AdminService {
           final userName = userData['nom'] as String? ?? 'Cher client';
 
           if (userEmail != null) {
-            print('📧 Envoi d\'email de décaissement à: $userEmail');
+            debugLog('📧 Envoi d\'email de décaissement à: $userEmail');
 
             // Calculer la date de première échéance (généralement 30 jours après)
             final firstPaymentDate = DateTime.now().add(
@@ -454,17 +454,17 @@ class AdminService {
                 )[0],
               },
             );
-            print('✅ Email de décaissement envoyé avec succès');
+            debugLog('✅ Email de décaissement envoyé avec succès');
           }
         }
       } catch (emailError) {
-        print(
+        debugLog(
           '❌ Erreur lors de l\'envoi d\'email de décaissement: $emailError',
         );
         // Ne pas faire échouer le décaissement si l'email échoue
       }
     } catch (e) {
-      print('Erreur confirmation décaissement: $e');
+      debugLog('Erreur confirmation décaissement: $e');
       throw Exception('Erreur lors de la confirmation du décaissement: $e');
     }
   }
@@ -507,7 +507,7 @@ class AdminService {
   /// Récupérer tous les échéanciers (schedules) Firebase
   Future<List<ScheduleItemModel>> getAllSchedules() async {
     try {
-      print('=== AdminService.getAllSchedules ===');
+      debugLog('=== AdminService.getAllSchedules ===');
 
       final QuerySnapshot snapshot = await _firestore
           .collection('schedules')
@@ -517,36 +517,36 @@ class AdminService {
 
       for (var doc in snapshot.docs) {
         try {
-          print('📄 Traitement schedule document: ${doc.id}');
+          debugLog('📄 Traitement schedule document: ${doc.id}');
 
           final data = doc.data() as Map<String, dynamic>;
 
           // ⚠️ VÉRIFICATION DES CHAMPS OBLIGATOIRES
           // Si loanId manque, c'est un schedule mal formé (marqué manuellement sans context complet)
           if (!data.containsKey('loanId') || data['loanId'] == null) {
-            print(
+            debugLog(
               '⚠️ Schedule ${doc.id} ignoré: manque loanId (schedule marqué manuellement sans contexte)',
             );
             continue;
           }
           if (!data.containsKey('dueDate') || data['dueDate'] == null) {
-            print('⚠️ Schedule ${doc.id} ignoré: manque dueDate');
+            debugLog('⚠️ Schedule ${doc.id} ignoré: manque dueDate');
             continue;
           }
           if (!data.containsKey('numero') || data['numero'] == null) {
-            print('⚠️ Schedule ${doc.id} ignoré: manque numero');
+            debugLog('⚠️ Schedule ${doc.id} ignoré: manque numero');
             continue;
           }
           if (!data.containsKey('principal') || data['principal'] == null) {
-            print('⚠️ Schedule ${doc.id} ignoré: manque principal');
+            debugLog('⚠️ Schedule ${doc.id} ignoré: manque principal');
             continue;
           }
           if (!data.containsKey('interet') || data['interet'] == null) {
-            print('⚠️ Schedule ${doc.id} ignoré: manque interet');
+            debugLog('⚠️ Schedule ${doc.id} ignoré: manque interet');
             continue;
           }
           if (!data.containsKey('total') || data['total'] == null) {
-            print('⚠️ Schedule ${doc.id} ignoré: manque total');
+            debugLog('⚠️ Schedule ${doc.id} ignoré: manque total');
             continue;
           }
 
@@ -561,7 +561,7 @@ class AdminService {
             try {
               DateTime.parse(data['dueDate'] as String);
             } catch (e) {
-              print('⚠️ Schedule ${doc.id} ignoré: dueDate invalide');
+              debugLog('⚠️ Schedule ${doc.id} ignoré: dueDate invalide');
               continue;
             }
           }
@@ -605,20 +605,20 @@ class AdminService {
 
           final schedule = ScheduleItemModel.fromJson(data);
           schedules.add(schedule);
-          print(
+          debugLog(
             '✅ Schedule ajouté: ${schedule.id} (${schedule.isPaid ? "payé" : "non payé"})',
           );
         } catch (e) {
-          print('❌ Erreur lors du parsing du schedule ${doc.id}: $e');
-          print('📄 Données problématiques: ${doc.data()}');
+          debugLog('❌ Erreur lors du parsing du schedule ${doc.id}: $e');
+          debugLog('📄 Données problématiques: ${doc.data()}');
           // Continue avec les autres documents
         }
       }
 
-      print('Total schedules récupérés: ${schedules.length}');
+      debugLog('Total schedules récupérés: ${schedules.length}');
       return schedules;
     } catch (e) {
-      print('Erreur récupération schedules: $e');
+      debugLog('Erreur récupération schedules: $e');
       throw Exception('Erreur lors de la récupération des échéanciers: $e');
     }
   }
@@ -653,9 +653,9 @@ class AdminService {
     required DateTime newStartDate,
   }) async {
     try {
-      print('=== AdminService.updateScheduleStartDate ===');
-      print('Prêt: $loanId');
-      print('Nouvelle date de début: ${newStartDate.toIso8601String()}');
+      debugLog('=== AdminService.updateScheduleStartDate ===');
+      debugLog('Prêt: $loanId');
+      debugLog('Nouvelle date de début: ${newStartDate.toIso8601String()}');
 
       // Récupérer le prêt pour avoir les infos de calcul
       final loanDoc = await _firestore.collection('loans').doc(loanId).get();
@@ -675,7 +675,7 @@ class AdminService {
         throw Exception('Aucun échéancier trouvé pour ce prêt');
       }
 
-      print('Échéanciers trouvés: ${schedulesSnapshot.docs.length}');
+      debugLog('Échéanciers trouvés: ${schedulesSnapshot.docs.length}');
 
       // 1. SAUVEGARDER les statuts de paiement
       final Map<int, Map<String, dynamic>> paidStatus = {};
@@ -690,11 +690,11 @@ class AdminService {
             'paidAt': data['paidAt'],
             'paidAmount': data['paidAmount'],
           };
-          print('  ✅ Échéance #$numero était payée - statut sauvegardé');
+          debugLog('  ✅ Échéance #$numero était payée - statut sauvegardé');
         }
       }
 
-      print('💾 ${paidStatus.length} paiements sauvegardés');
+      debugLog('💾 ${paidStatus.length} paiements sauvegardés');
 
       // 2. SUPPRIMER toutes les anciennes échéances
       final batch = _firestore.batch();
@@ -702,7 +702,7 @@ class AdminService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      print(
+      debugLog(
         '🗑️ ${schedulesSnapshot.docs.length} anciennes échéances supprimées',
       );
 
@@ -741,7 +741,7 @@ class AdminService {
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-        print(
+        debugLog(
           '  ✅ Échéance #$numero créée: $dueDate (${wasPaid ? "payée" : "non payée"})',
         );
       }
@@ -752,11 +752,11 @@ class AdminService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      print(
+      debugLog(
         '✅ ${dureeMois} échéances recréées avec ${paidStatus.length} paiements préservés',
       );
     } catch (e) {
-      print('❌ Erreur lors de la mise à jour des dates: $e');
+      debugLog('❌ Erreur lors de la mise à jour des dates: $e');
       throw Exception(
         'Erreur lors de la mise à jour des dates d\'échéancier: $e',
       );

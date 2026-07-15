@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/loan_model.dart';
 import '../models/repayment_model.dart';
@@ -10,8 +11,8 @@ class BorrowerService {
   /// Récupérer tous les prêts de l'utilisateur connecté
   Future<List<LoanModel>> getUserLoans(String userId) async {
     try {
-      print('=== BorrowerService.getUserLoans ===');
-      print('User ID: $userId');
+      debugLog('=== BorrowerService.getUserLoans ===');
+      debugLog('User ID: $userId');
 
       final QuerySnapshot snapshot = await _firestore
           .collection('loans')
@@ -25,14 +26,14 @@ class BorrowerService {
       // Trier en mémoire par date de création
       loans.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      print('Prêts utilisateur trouvés: ${loans.length}');
+      debugLog('Prêts utilisateur trouvés: ${loans.length}');
       for (final loan in loans) {
-        print('- Prêt ${loan.id}: ${loan.montant}€, Statut: ${loan.statut}');
+        debugLog('- Prêt ${loan.id}: ${loan.montant}€, Statut: ${loan.statut}');
       }
 
       return loans;
     } catch (e) {
-      print('Erreur récupération prêts utilisateur: $e');
+      debugLog('Erreur récupération prêts utilisateur: $e');
       throw Exception('Erreur lors de la récupération des prêts: $e');
     }
   }
@@ -43,8 +44,8 @@ class BorrowerService {
     LoanStatus status,
   ) async {
     try {
-      print('=== BorrowerService.getUserLoansByStatus ===');
-      print('User ID: $userId, Statut: $status');
+      debugLog('=== BorrowerService.getUserLoansByStatus ===');
+      debugLog('User ID: $userId, Statut: $status');
 
       final QuerySnapshot snapshot = await _firestore
           .collection('loans')
@@ -59,11 +60,11 @@ class BorrowerService {
       // Trier en mémoire par date de création
       loans.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      print('Prêts avec statut $status: ${loans.length}');
+      debugLog('Prêts avec statut $status: ${loans.length}');
 
       return loans;
     } catch (e) {
-      print('Erreur récupération prêts par statut: $e');
+      debugLog('Erreur récupération prêts par statut: $e');
       throw Exception('Erreur lors de la récupération des prêts: $e');
     }
   }
@@ -73,7 +74,7 @@ class BorrowerService {
     try {
       return await _repaymentService.getUserRepayments(userId);
     } catch (e) {
-      print('Erreur récupération échéancier: $e');
+      debugLog('Erreur récupération échéancier: $e');
       throw Exception('Erreur lors de la récupération de l\'échéancier: $e');
     }
   }
@@ -83,7 +84,7 @@ class BorrowerService {
     try {
       return await _repaymentService.getLoanRepayments(loanId);
     } catch (e) {
-      print('Erreur récupération remboursements prêt: $e');
+      debugLog('Erreur récupération remboursements prêt: $e');
       throw Exception('Erreur lors de la récupération des remboursements: $e');
     }
   }
@@ -91,8 +92,8 @@ class BorrowerService {
   /// Récupérer le détail d'un prêt spécifique
   Future<LoanModel?> getLoanDetails(String loanId, String userId) async {
     try {
-      print('=== BorrowerService.getLoanDetails ===');
-      print('Loan ID: $loanId, User ID: $userId');
+      debugLog('=== BorrowerService.getLoanDetails ===');
+      debugLog('Loan ID: $loanId, User ID: $userId');
 
       final DocumentSnapshot doc = await _firestore
           .collection('loans')
@@ -112,7 +113,7 @@ class BorrowerService {
 
       return null;
     } catch (e) {
-      print('Erreur récupération détail prêt: $e');
+      debugLog('Erreur récupération détail prêt: $e');
       throw Exception('Erreur lors de la récupération du prêt: $e');
     }
   }
@@ -120,7 +121,7 @@ class BorrowerService {
   /// Obtenir un résumé des prêts de l'utilisateur
   Future<Map<String, dynamic>> getUserLoansSummary(String userId) async {
     try {
-      print('=== BorrowerService.getUserLoansSummary ===');
+      debugLog('=== BorrowerService.getUserLoansSummary ===');
 
       final loans = await getUserLoans(userId);
       final repayments = await getUserRepayments(userId);
@@ -149,10 +150,10 @@ class BorrowerService {
         'nextPaymentDue': _getNextPaymentDue(repayments),
       };
 
-      print('Résumé utilisateur: $summary');
+      debugLog('Résumé utilisateur: $summary');
       return summary;
     } catch (e) {
-      print('Erreur calcul résumé: $e');
+      debugLog('Erreur calcul résumé: $e');
       throw Exception('Erreur lors du calcul du résumé: $e');
     }
   }

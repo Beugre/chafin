@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Service pour gérer les évaluations de risque des clients
@@ -36,7 +37,7 @@ class RiskAssessmentService {
 
       return true;
     } catch (e) {
-      print('❌ Erreur lors de la mise à jour de l\'évaluation de risque: $e');
+      debugLog('❌ Erreur lors de la mise à jour de l\'évaluation de risque: $e');
       return false;
     }
   }
@@ -63,7 +64,7 @@ class RiskAssessmentService {
         };
       }).toList();
     } catch (e) {
-      print('❌ Erreur lors de la récupération de l\'historique: $e');
+      debugLog('❌ Erreur lors de la récupération de l\'historique: $e');
       return [];
     }
   }
@@ -84,7 +85,7 @@ class RiskAssessmentService {
         'evaluatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('❌ Erreur lors de l\'enregistrement de l\'historique: $e');
+      debugLog('❌ Erreur lors de l\'enregistrement de l\'historique: $e');
       // Ne pas faire échouer la mise à jour si l'historique échoue
     }
   }
@@ -131,7 +132,7 @@ class RiskAssessmentService {
             : 0.0,
       };
     } catch (e) {
-      print('❌ Erreur lors du calcul des statistiques: $e');
+      debugLog('❌ Erreur lors du calcul des statistiques: $e');
       return {};
     }
   }

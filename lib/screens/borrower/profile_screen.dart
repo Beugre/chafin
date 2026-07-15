@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/loan_provider.dart';
+import '../../config/app_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -10,7 +11,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Consumer<AuthProvider>(
           builder: (context, authProvider, child) {
@@ -23,32 +24,18 @@ class ProfileScreen extends StatelessWidget {
             return SingleChildScrollView(
               child: Column(
                 children: [
-                  // Header avec profil
+                  // Header blanc Revolut
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF00D4FF), Color(0xFF3B82F6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(30),
-                        bottomRight: Radius.circular(30),
-                      ),
-                    ),
-                    child: Column(
+                    color: Colors.white,
+                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+                    child: Row(
                       children: [
-                        const SizedBox(height: 20),
-                        // Avatar
                         Container(
-                          width: 100,
-                          height: 100,
+                          width: 64,
+                          height: 64,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(50),
-                            border: Border.all(color: Colors.white, width: 3),
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(32),
                           ),
                           child: Center(
                             child: Text(
@@ -56,160 +43,169 @@ class ProfileScreen extends StatelessWidget {
                                   ? user.nomComplet[0].toUpperCase()
                                   : 'U',
                               style: const TextStyle(
-                                fontSize: 40,
+                                fontSize: 28,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          user.nomComplet,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user.nomComplet,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                user.email,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.textSecondaryColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user.email,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.white70,
+                        GestureDetector(
+                          onTap: () => context.push('/profile/edit'),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.backgroundColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: AppTheme.primaryColor,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 8),
 
-                  // Sections du profil
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const SizedBox(height: 12),
+
                         // Informations personnelles
-                        _buildProfileSection('Informations personnelles', [
-                          _buildProfileItem(
-                            Icons.person,
-                            'Nom complet',
-                            user.nomComplet,
-                            Colors.blue,
-                          ),
-                          _buildProfileItem(
-                            Icons.email,
-                            'Email',
-                            user.email,
-                            Colors.green,
-                          ),
-                          _buildProfileItem(
-                            Icons.phone,
+                        _buildSectionTitle('Informations personnelles'),
+                        const SizedBox(height: 8),
+                        _buildListCard([
+                          _buildListItem(
+                            Icons.phone_outlined,
                             'Téléphone',
                             user.telephone,
-                            Colors.orange,
                           ),
-                          _buildProfileItem(
-                            Icons.location_on,
+                          _buildDivider(),
+                          _buildListItem(
+                            Icons.location_on_outlined,
                             'Adresse',
                             user.adresse,
-                            Colors.purple,
                           ),
                         ]),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         // Niveau de risque
-                        _buildRiskSection(user),
+                        _buildSectionTitle('Niveau de confiance'),
+                        const SizedBox(height: 8),
+                        _buildRiskCard(user),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
-                        // Statistiques de prêt
+                        // Statistiques
+                        _buildSectionTitle('Statistiques'),
+                        const SizedBox(height: 8),
                         Consumer<LoanProvider>(
                           builder: (context, loanProvider, child) {
                             final activeLoans = loanProvider.userLoans
-                                .where((loan) => loan.isActive)
+                                .where((l) => l.isActive)
                                 .length;
                             final totalBorrowed = loanProvider.userLoans
-                                .where(
-                                  (loan) => loan.isActive || loan.isCompleted,
-                                )
-                                .fold(0.0, (sum, loan) => sum + loan.montant);
+                                .where((l) => l.isActive || l.isCompleted)
+                                .fold(0.0, (sum, l) => sum + l.montant);
 
-                            return _buildProfileSection('Mes statistiques', [
-                              _buildProfileItem(
-                                Icons.trending_up,
+                            return _buildListCard([
+                              _buildStatItem(
                                 'Prêts actifs',
                                 '$activeLoans',
-                                Colors.blue,
+                                AppTheme.primaryColor,
                               ),
-                              _buildProfileItem(
-                                Icons.euro,
+                              _buildDivider(),
+                              _buildStatItem(
                                 'Total emprunté',
-                                '${totalBorrowed.toStringAsFixed(0)}€',
-                                Colors.green,
+                                '${totalBorrowed.toStringAsFixed(0)} €',
+                                AppTheme.successColor,
                               ),
-                              _buildProfileItem(
-                                Icons.history,
-                                'Total des prêts',
+                              _buildDivider(),
+                              _buildStatItem(
+                                'Nb total de prêts',
                                 '${loanProvider.userLoans.length}',
-                                Colors.orange,
+                                AppTheme.warningColor,
                               ),
                             ]);
                           },
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         // Actions
-                        _buildProfileSection('Actions', [
+                        _buildSectionTitle('Compte'),
+                        const SizedBox(height: 8),
+                        _buildListCard([
                           _buildActionItem(
-                            Icons.edit,
-                            'Modifier le profil',
-                            Colors.blue,
-                            () {
-                              context.push('/profile/edit');
-                            },
-                          ),
-                          _buildActionItem(
-                            Icons.security,
+                            context,
+                            Icons.security_outlined,
                             'Sécurité et confidentialité',
-                            Colors.green,
-                            () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Fonctionnalité en cours de développement',
+                            onTap: () =>
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Fonctionnalité en cours de développement',
+                                    ),
                                   ),
                                 ),
-                              );
-                            },
                           ),
+                          _buildDivider(),
                           _buildActionItem(
-                            Icons.help,
+                            context,
+                            Icons.help_outline,
                             'Aide et support',
-                            Colors.orange,
-                            () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Fonctionnalité en cours de développement',
+                            onTap: () =>
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Fonctionnalité en cours de développement',
+                                    ),
                                   ),
                                 ),
-                              );
-                            },
                           ),
+                          _buildDivider(),
                           _buildActionItem(
+                            context,
                             Icons.logout,
                             'Se déconnecter',
-                            Colors.red,
-                            () => _showLogoutDialog(context),
+                            color: AppTheme.errorColor,
+                            onTap: () => _showLogoutDialog(context),
                           ),
                         ]),
 
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
@@ -222,77 +218,71 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileSection(String title, List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          ...children,
-        ],
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.textSecondaryColor,
+        letterSpacing: 1.2,
       ),
     );
   }
 
-  Widget _buildProfileItem(
-    IconData icon,
-    String label,
-    String value,
-    Color color,
-  ) {
+  Widget _buildListCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildDivider() {
+    return const Divider(
+      height: 1,
+      indent: 56,
+      endIndent: 0,
+      color: Color(0xFFE5E7EB),
+    );
+  }
+
+  Widget _buildListItem(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, size: 15, color: AppTheme.primaryColor),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondaryColor,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  value,
+                  value.isNotEmpty ? value : '—',
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textPrimaryColor,
                   ),
                 ),
               ],
@@ -303,160 +293,204 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRiskSection(dynamic user) {
-    final hasAssessment = user.niveauConfiance != null;
-    final double level = (user.niveauConfiance ?? 0.0) as double;
-
-    Color riskColor;
-    IconData riskIcon;
-    String riskLabel;
-    String riskDescription;
-
-    if (!hasAssessment) {
-      riskColor = Colors.grey;
-      riskIcon = Icons.help_outline;
-      riskLabel = 'Non évalué';
-      riskDescription = 'Votre niveau de risque n\'a pas encore été évalué.';
-    } else if (level >= 4.0) {
-      riskColor = Colors.green;
-      riskIcon = Icons.verified_user;
-      riskLabel = 'Faible risque';
-      riskDescription =
-          'Excellent ! Vous bénéficiez de taux préférentiels (divisés par 2).';
-    } else if (level >= 2.0) {
-      riskColor = Colors.orange;
-      riskIcon = Icons.shield;
-      riskLabel = 'Risque normal';
-      riskDescription =
-          'Votre profil est standard. Vos taux d\'intérêt sont normaux.';
-    } else {
-      riskColor = Colors.red;
-      riskIcon = Icons.warning;
-      riskLabel = 'Gros risque';
-      riskDescription =
-          'Attention ! Vos taux d\'intérêt sont doublés. Régularisez vos paiements.';
-    }
-
-    return _buildProfileSection('Mon niveau de risque', [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: riskColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: riskColor.withOpacity(0.3)),
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
           ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppTheme.textPrimaryColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionItem(
+    BuildContext context,
+    IconData icon,
+    String label, {
+    Color? color,
+    required VoidCallback onTap,
+  }) {
+    final c = color ?? AppTheme.textPrimaryColor;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
-                  color: riskColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: c.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(riskIcon, color: riskColor, size: 28),
+                child: Icon(icon, size: 15, color: c),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          riskLabel,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: riskColor,
-                          ),
-                        ),
-                        if (hasAssessment) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: riskColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${level.toStringAsFixed(1)}/5',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: riskColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      riskDescription,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                    ),
-                  ],
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: c,
+                  ),
                 ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: AppTheme.textHintColor,
               ),
             ],
           ),
         ),
       ),
-    ]);
+    );
   }
 
-  Widget _buildActionItem(
-    IconData icon,
-    String label,
-    Color color,
-    VoidCallback onTap,
-  ) {
+  Widget _buildRiskCard(dynamic user) {
+    final hasAssessment = user.niveauConfiance != null;
+    final double level = (user.niveauConfiance ?? 0.0) as double;
+
+    Color color;
+    String label;
+    String description;
+
+    if (!hasAssessment) {
+      color = AppTheme.textSecondaryColor;
+      label = 'Non évalué';
+      description = 'Votre niveau de risque n\'a pas encore été évalué.';
+    } else if (level >= 4.0) {
+      color = AppTheme.successColor;
+      label = 'Faible risque';
+      description = 'Excellent ! Vous bénéficiez de taux préférentiels.';
+    } else if (level >= 2.0) {
+      color = AppTheme.warningColor;
+      label = 'Risque normal';
+      description = 'Profil standard, taux d\'intérêt normaux.';
+    } else {
+      color = AppTheme.errorColor;
+      label = 'Risque élevé';
+      description = 'Taux d\'intérêt majorés. Régularisez vos paiements.';
+    }
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              level >= 4.0
+                  ? Icons.verified_outlined
+                  : level >= 2.0
+                  ? Icons.shield_outlined
+                  : Icons.warning_amber_outlined,
+              color: color,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                Row(
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
                     ),
-                  ),
+                    if (hasAssessment) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${level.toStringAsFixed(1)}/5',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey[400],
+                const SizedBox(height: 3),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondaryColor,
+                  ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -466,52 +500,49 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.logout, color: Colors.red, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Text('Déconnexion'),
-          ],
+        title: const Text(
+          'Se déconnecter ?',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimaryColor,
+          ),
         ),
-        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir vous déconnecter ?',
+          style: TextStyle(color: AppTheme.textSecondaryColor),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('Annuler', style: TextStyle(color: Colors.grey[600])),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(8),
+            child: const Text(
+              'Annuler',
+              style: TextStyle(color: AppTheme.textSecondaryColor),
             ),
-            child: TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-
-                final loanProvider = Provider.of<LoanProvider>(
-                  context,
-                  listen: false,
-                );
-                await Provider.of<AuthProvider>(
-                  context,
-                  listen: false,
-                ).signOutAndClearData(loanProvider);
-
-                if (context.mounted) {
-                  context.go('/login');
-                }
-              },
-              child: const Text(
-                'Se déconnecter',
-                style: TextStyle(color: Colors.white),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final loanProvider = Provider.of<LoanProvider>(
+                context,
+                listen: false,
+              );
+              await Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              ).signOutAndClearData(loanProvider);
+              if (context.mounted) {
+                context.go('/login');
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
+            ),
+            child: const Text(
+              'Se déconnecter',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],

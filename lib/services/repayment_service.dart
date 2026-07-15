@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/loan_model.dart';
@@ -10,15 +11,15 @@ class RepaymentService {
   /// Générer l'échéancier pour un prêt approuvé
   Future<void> generateRepaymentSchedule(LoanModel loan) async {
     try {
-      print('=== RepaymentService.generateRepaymentSchedule ===');
-      print(
+      debugLog('=== RepaymentService.generateRepaymentSchedule ===');
+      debugLog(
         'Prêt ID: ${loan.id}, Montant: ${loan.montant}€, Durée: ${loan.dureeMois} mois',
       );
 
       // Vérifier s'il existe déjà un échéancier pour ce prêt
       final existingRepayments = await getLoanRepayments(loan.id);
       if (existingRepayments.isNotEmpty) {
-        print(
+        debugLog(
           'Échéancier déjà existant (${existingRepayments.length} mensualités)',
         );
         return;
@@ -32,7 +33,7 @@ class RepaymentService {
         premierRemboursement.day,
       );
 
-      print('Date début remboursements: $dateDebutRemboursement');
+      debugLog('Date début remboursements: $dateDebutRemboursement');
 
       final List<RepaymentModel> mensualites = [];
 
@@ -57,7 +58,7 @@ class RepaymentService {
         mensualites.add(mensualite);
       }
 
-      print('Échéancier généré: ${mensualites.length} mensualités');
+      debugLog('Échéancier généré: ${mensualites.length} mensualités');
 
       // Sauvegarder toutes les mensualités en batch
       final WriteBatch batch = _firestore.batch();
@@ -68,9 +69,9 @@ class RepaymentService {
       }
 
       await batch.commit();
-      print('Échéancier sauvegardé avec succès');
+      debugLog('Échéancier sauvegardé avec succès');
     } catch (e) {
-      print('Erreur génération échéancier: $e');
+      debugLog('Erreur génération échéancier: $e');
       throw Exception('Erreur lors de la génération de l\'échéancier: $e');
     }
   }
@@ -78,8 +79,8 @@ class RepaymentService {
   /// Récupérer l'échéancier d'un prêt
   Future<List<RepaymentModel>> getLoanRepayments(String loanId) async {
     try {
-      print('=== RepaymentService.getLoanRepayments ===');
-      print('Prêt ID: $loanId');
+      debugLog('=== RepaymentService.getLoanRepayments ===');
+      debugLog('Prêt ID: $loanId');
 
       final QuerySnapshot snapshot = await _firestore
           .collection('repayments')
@@ -94,11 +95,11 @@ class RepaymentService {
           )
           .toList();
 
-      print('Mensualités trouvées: ${repayments.length}');
+      debugLog('Mensualités trouvées: ${repayments.length}');
 
       return repayments;
     } catch (e) {
-      print('Erreur récupération échéancier: $e');
+      debugLog('Erreur récupération échéancier: $e');
       throw Exception('Erreur lors de la récupération de l\'échéancier: $e');
     }
   }
@@ -111,8 +112,8 @@ class RepaymentService {
     String? noteAdmin,
   }) async {
     try {
-      print('=== RepaymentService.markRepaymentAsPaid ===');
-      print('Mensualité ID: $repaymentId, Montant: $montantPaye€');
+      debugLog('=== RepaymentService.markRepaymentAsPaid ===');
+      debugLog('Mensualité ID: $repaymentId, Montant: $montantPaye€');
 
       await _firestore.collection('repayments').doc(repaymentId).update({
         'montantPaye': montantPaye,
@@ -123,12 +124,12 @@ class RepaymentService {
         'noteAdmin': noteAdmin,
       });
 
-      print('Mensualité marquée comme payée');
+      debugLog('Mensualité marquée comme payée');
 
       // Vérifier si toutes les mensualités du prêt sont payées
       await _checkLoanCompletionStatus(repaymentId);
     } catch (e) {
-      print('Erreur marquage paiement: $e');
+      debugLog('Erreur marquage paiement: $e');
       throw Exception('Erreur lors du marquage du paiement: $e');
     }
   }
@@ -154,7 +155,7 @@ class RepaymentService {
       final bool allPaid = allRepayments.every((r) => r.isPaid);
 
       if (allPaid) {
-        print('Toutes les mensualités sont payées, prêt soldé');
+        debugLog('Toutes les mensualités sont payées, prêt soldé');
 
         // Mettre à jour le statut du prêt
         await _firestore.collection('loans').doc(loanId).update({
@@ -177,7 +178,7 @@ class RepaymentService {
             
             // S'il n'y a plus de retards, repasser le prêt "enCours"
             if (!hasOverdueRepayments) {
-              print('Plus de retards, prêt repassé en cours');
+              debugLog('Plus de retards, prêt repassé en cours');
               await _firestore.collection('loans').doc(loanId).update({
                 'statut': LoanStatus.enCours.toString().split('.').last,
                 'updatedAt': DateTime.now().toIso8601String(),
@@ -187,15 +188,15 @@ class RepaymentService {
         }
       }
     } catch (e) {
-      print('Erreur vérification statut prêt: $e');
+      debugLog('Erreur vérification statut prêt: $e');
     }
   }
 
   /// Récupérer tous les remboursements d'un utilisateur
   Future<List<RepaymentModel>> getUserRepayments(String userId) async {
     try {
-      print('=== RepaymentService.getUserRepayments ===');
-      print('User ID: $userId');
+      debugLog('=== RepaymentService.getUserRepayments ===');
+      debugLog('User ID: $userId');
 
       // Requête sans orderBy pour éviter l'erreur d'index
       final QuerySnapshot snapshot = await _firestore
@@ -213,11 +214,11 @@ class RepaymentService {
       // Trier en mémoire par date d'échéance
       repayments.sort((a, b) => a.dateEcheance.compareTo(b.dateEcheance));
 
-      print('Mensualités utilisateur: ${repayments.length}');
+      debugLog('Mensualités utilisateur: ${repayments.length}');
 
       return repayments;
     } catch (e) {
-      print('Erreur récupération mensualités utilisateur: $e');
+      debugLog('Erreur récupération mensualités utilisateur: $e');
       throw Exception('Erreur lors de la récupération des mensualités: $e');
     }
   }
@@ -225,7 +226,7 @@ class RepaymentService {
   /// Récupérer les mensualités en retard
   Future<List<RepaymentModel>> getOverdueRepayments() async {
     try {
-      print('=== RepaymentService.getOverdueRepayments ===');
+      debugLog('=== RepaymentService.getOverdueRepayments ===');
 
       final DateTime now = DateTime.now();
 
@@ -249,7 +250,7 @@ class RepaymentService {
           .where((repayment) => repayment.dateEcheance.isBefore(now))
           .toList();
 
-      print('Mensualités en retard: ${overdue.length}');
+      debugLog('Mensualités en retard: ${overdue.length}');
 
       // Marquer automatiquement comme en retard si nécessaire
       for (final repayment in overdue) {
@@ -263,7 +264,7 @@ class RepaymentService {
 
       return overdue;
     } catch (e) {
-      print('Erreur récupération retards: $e');
+      debugLog('Erreur récupération retards: $e');
       throw Exception('Erreur lors de la récupération des retards: $e');
     }
   }

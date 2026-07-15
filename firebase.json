@@ -34,7 +34,7 @@
                 ]
             },
             {
-                "source": "main.dart.js",
+                "source": "index.html",
                 "headers": [
                     {
                         "key": "Cache-Control",
@@ -43,11 +43,29 @@
                 ]
             },
             {
-                "source": "index.html",
+                "source": "main.dart.js",
                 "headers": [
                     {
                         "key": "Cache-Control",
-                        "value": "no-cache, no-store, must-revalidate"
+                        "value": "public, max-age=31536000, immutable"
+                    }
+                ]
+            },
+            {
+                "source": "**/*.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=31536000, immutable"
+                    }
+                ]
+            },
+            {
+                "source": "assets/**",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=31536000, immutable"
                     }
                 ]
             }

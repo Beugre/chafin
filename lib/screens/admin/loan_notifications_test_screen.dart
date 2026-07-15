@@ -98,6 +98,12 @@ class _LoanNotificationsTestScreenState
         return 'Taux modifié';
       case LoanEmailType.adminLoanRequest:
         return 'Nouvelle demande (Admin)';
+      case LoanEmailType.referralLoanRequested:
+        return 'Parrainage - Demande';
+      case LoanEmailType.referralLoanDisbursed:
+        return 'Parrainage - Décaissement';
+      case LoanEmailType.referralCommissionPaid:
+        return 'Parrainage - Commission versée';
     }
   }
 

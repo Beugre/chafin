@@ -118,6 +118,17 @@ class _EmailTestScreenState extends State<EmailTestScreen> {
           'rate': '20.0',
           'loanId': 'TEST-001',
         };
+      case LoanEmailType.referralLoanRequested:
+        return {'filleulName': 'Test Filleul', 'amount': '2000'};
+      case LoanEmailType.referralLoanDisbursed:
+        return {
+          'filleulName': 'Test Filleul',
+          'amount': '2000',
+          'interets': '200',
+          'commission': '40',
+        };
+      case LoanEmailType.referralCommissionPaid:
+        return {'filleulName': 'Test Filleul', 'commission': '40'};
     }
   }
 

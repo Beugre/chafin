@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
@@ -48,16 +49,16 @@ class AuthService {
     String? ibanMasked,
   }) async {
     try {
-      print('=== AuthService.createUserWithEmailAndPassword ===');
-      print('Email: $email');
-      print('Nom: $nom');
+      debugLog('=== AuthService.createUserWithEmailAndPassword ===');
+      debugLog('Email: $email');
+      debugLog('Nom: $nom');
 
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      print('Firebase Auth créé avec succès: ${result.user?.uid}');
+      debugLog('Firebase Auth créé avec succès: ${result.user?.uid}');
 
       if (result.user != null) {
         final user = UserModel(
@@ -72,22 +73,22 @@ class AuthService {
           createdAt: DateTime.now(),
         );
 
-        print('Création du document Firestore...');
+        debugLog('Création du document Firestore...');
         await _firestore
             .collection('users')
             .doc(result.user!.uid)
             .set(user.toJson());
 
-        print('Document Firestore créé avec succès');
+        debugLog('Document Firestore créé avec succès');
         return user;
       }
       return null;
     } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException: ${e.code} - ${e.message}');
+      debugLog('FirebaseAuthException: ${e.code} - ${e.message}');
       throw _handleAuthException(e);
     } catch (e) {
-      print('Exception générale: $e');
-      print('Type: ${e.runtimeType}');
+      debugLog('Exception générale: $e');
+      debugLog('Type: ${e.runtimeType}');
       throw 'Erreur lors de la création du compte: $e';
     }
   }
@@ -95,7 +96,7 @@ class AuthService {
   /// Récupération des données utilisateur
   Future<UserModel?> getUserData(String uid) async {
     try {
-      print(
+      debugLog(
         '📊 AuthService.getUserData() - Récupération données pour UID: $uid',
       );
 
@@ -106,20 +107,20 @@ class AuthService {
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
-        print('📄 Données brutes Firestore: $data');
+        debugLog('📄 Données brutes Firestore: $data');
 
         final user = UserModel.fromJson(data);
-        print(
+        debugLog(
           '👤 UserModel créé - Nom: ${user.nom}, Rôle: ${user.role}, IsAdmin: ${user.isAdmin}',
         );
 
         return user;
       }
 
-      print('❌ Document utilisateur n\'existe pas pour UID: $uid');
+      debugLog('❌ Document utilisateur n\'existe pas pour UID: $uid');
       return null;
     } catch (e) {
-      print('❌ Erreur getUserData: $e');
+      debugLog('❌ Erreur getUserData: $e');
       throw Exception(
         'Erreur lors de la récupération des données utilisateur: $e',
       );

@@ -4,12 +4,12 @@ import 'package:flutter/services.dart';
 /// Configuration du thème Revolut-inspired pour Chafin
 class AppTheme {
   // --- Palette Revolut ---
-  static const Color primaryColor = Color(0xFF0666EB);    // Revolut blue
-  static const Color accentColor = Color(0xFF00C2FF);     // Cyan accent
-  static const Color successColor = Color(0xFF00B876);    // Revolut green
-  static const Color errorColor = Color(0xFFFF3B30);      // iOS-like red
-  static const Color warningColor = Color(0xFFFF9F0A);    // Amber
-  static const Color secondaryColor = Color(0xFF6C63FF);  // Purple accent
+  static const Color primaryColor = Color(0xFF0666EB); // Revolut blue
+  static const Color accentColor = Color(0xFF00C2FF); // Cyan accent
+  static const Color successColor = Color(0xFF00B876); // Revolut green
+  static const Color errorColor = Color(0xFFFF3B30); // iOS-like red
+  static const Color warningColor = Color(0xFFFF9F0A); // Amber
+  static const Color secondaryColor = Color(0xFF6C63FF); // Purple accent
 
   // Fond et surface
   static const Color backgroundColor = Color(0xFFF7F8FA);
@@ -207,9 +207,21 @@ class AppTheme {
           fontWeight: FontWeight.w600,
           color: textPrimaryColor,
         ),
-        bodyLarge: TextStyle(fontSize: 16, color: textPrimaryColor, height: 1.5),
-        bodyMedium: TextStyle(fontSize: 14, color: textSecondaryColor, height: 1.5),
-        bodySmall: TextStyle(fontSize: 12, color: textSecondaryColor, height: 1.4),
+        bodyLarge: TextStyle(
+          fontSize: 16,
+          color: textPrimaryColor,
+          height: 1.5,
+        ),
+        bodyMedium: TextStyle(
+          fontSize: 14,
+          color: textSecondaryColor,
+          height: 1.5,
+        ),
+        bodySmall: TextStyle(
+          fontSize: 12,
+          color: textSecondaryColor,
+          height: 1.4,
+        ),
         labelLarge: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,

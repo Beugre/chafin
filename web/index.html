@@ -1,4 +1,10 @@
 <!DOCTYPE html><html><head>
+  <!-- Redirect chafin.web.app → finimoi.com -->
+  <script>
+    if (window.location.hostname === 'chafin.web.app' || window.location.hostname === 'chafin-23cad.web.app') {
+      window.location.replace('https://finimoi.com' + window.location.pathname + window.location.search + window.location.hash);
+    }
+  </script>
   <!--
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
@@ -16,20 +22,20 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Chafin Loans - Plateforme de prêts entre amis">
-  <meta name="keywords" content="prêt, financement, amis, chafin">
-  <meta name="author" content="Chafin Loans">
+  <meta name="description" content="Finimoi - Plateforme de prêts entre amis">
+  <meta name="keywords" content="prêt, financement, amis, finimoi">
+  <meta name="author" content="Finimoi">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Chafin Loans">
+  <meta name="apple-mobile-web-app-title" content="Finimoi">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png">
 
-  <title>Chafin Loans - Plateforme de prêts entre amis</title>
+  <title>Finimoi - Plateforme de prêts entre amis</title>
   <link rel="manifest" href="manifest.json">
 
   <!-- Firebase Configuration -->

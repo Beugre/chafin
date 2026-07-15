@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CleanupService {
@@ -6,7 +7,7 @@ class CleanupService {
   /// Nettoyer les échéanciers dupliqués
   Future<void> cleanupDuplicateRepayments() async {
     try {
-      print('=== CleanupService.cleanupDuplicateRepayments ===');
+      debugLog('=== CleanupService.cleanupDuplicateRepayments ===');
 
       // Récupérer tous les remboursements
       final QuerySnapshot allRepayments = await _firestore
@@ -32,11 +33,11 @@ class CleanupService {
         final repayments = entry.value;
 
         if (repayments.length <= 12) {
-          print('Prêt $loanId: ${repayments.length} mensualités - OK');
+          debugLog('Prêt $loanId: ${repayments.length} mensualités - OK');
           continue;
         }
 
-        print(
+        debugLog(
           'Prêt $loanId: ${repayments.length} mensualités - NETTOYAGE REQUIS',
         );
 
@@ -83,7 +84,7 @@ class CleanupService {
               if (doc.id != toKeep.id) {
                 batch.delete(doc.reference);
                 deletedCount++;
-                print(
+                debugLog(
                   '  Suppression mensualité ${monthEntry.key} (ID: ${doc.id})',
                 );
               }
@@ -93,15 +94,15 @@ class CleanupService {
 
         if (deletedCount > 0) {
           await batch.commit();
-          print(
+          debugLog(
             'Prêt $loanId: $deletedCount mensualités dupliquées supprimées',
           );
         }
       }
 
-      print('Nettoyage terminé');
+      debugLog('Nettoyage terminé');
     } catch (e) {
-      print('Erreur nettoyage: $e');
+      debugLog('Erreur nettoyage: $e');
       throw Exception('Erreur lors du nettoyage: $e');
     }
   }
@@ -109,8 +110,8 @@ class CleanupService {
   /// Nettoyer un prêt spécifique
   Future<void> cleanupLoanRepayments(String loanId) async {
     try {
-      print('=== CleanupService.cleanupLoanRepayments ===');
-      print('Nettoyage prêt: $loanId');
+      debugLog('=== CleanupService.cleanupLoanRepayments ===');
+      debugLog('Nettoyage prêt: $loanId');
 
       final QuerySnapshot repayments = await _firestore
           .collection('repayments')
@@ -118,11 +119,11 @@ class CleanupService {
           .get();
 
       if (repayments.docs.isEmpty) {
-        print('Aucune mensualité trouvée');
+        debugLog('Aucune mensualité trouvée');
         return;
       }
 
-      print('Mensualités trouvées: ${repayments.docs.length}');
+      debugLog('Mensualités trouvées: ${repayments.docs.length}');
 
       // Grouper par numéro de mensualité
       final Map<int, List<QueryDocumentSnapshot>> byMonth = {};
@@ -145,7 +146,7 @@ class CleanupService {
         final monthlyRepayments = monthEntry.value;
 
         if (monthlyRepayments.length > 1) {
-          print(
+          debugLog(
             'Mensualité ${monthEntry.key}: ${monthlyRepayments.length} doublons',
           );
 
@@ -159,7 +160,7 @@ class CleanupService {
 
             if (statut == 'paye') {
               toKeep = doc;
-              print('  Garde mensualité payée: ${doc.id}');
+              debugLog('  Garde mensualité payée: ${doc.id}');
               break;
             }
           }
@@ -167,7 +168,7 @@ class CleanupService {
           // Si aucune n'est payée, garder la première
           if (toKeep == null) {
             toKeep = monthlyRepayments.first;
-            print('  Garde première mensualité: ${toKeep.id}');
+            debugLog('  Garde première mensualité: ${toKeep.id}');
           }
 
           // Supprimer les autres
@@ -175,7 +176,7 @@ class CleanupService {
             if (doc.id != toKeep.id) {
               batch.delete(doc.reference);
               deletedCount++;
-              print('  Supprime: ${doc.id}');
+              debugLog('  Supprime: ${doc.id}');
             }
           }
         }
@@ -183,12 +184,12 @@ class CleanupService {
 
       if (deletedCount > 0) {
         await batch.commit();
-        print('$deletedCount mensualités dupliquées supprimées');
+        debugLog('$deletedCount mensualités dupliquées supprimées');
       } else {
-        print('Aucun doublon trouvé');
+        debugLog('Aucun doublon trouvé');
       }
     } catch (e) {
-      print('Erreur nettoyage prêt: $e');
+      debugLog('Erreur nettoyage prêt: $e');
       throw Exception('Erreur lors du nettoyage du prêt: $e');
     }
   }

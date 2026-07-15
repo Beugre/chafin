@@ -1,3 +1,4 @@
+import '../utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
@@ -21,17 +22,17 @@ class AuthProvider with ChangeNotifier {
 
   /// Initialiser le provider avec l'état actuel et persistance de session
   Future<void> init() async {
-    print('🔐 AuthProvider.init() - Démarrage...');
+    debugLog('🔐 AuthProvider.init() - Démarrage...');
 
     // Vérifier d'abord s'il y a un utilisateur déjà connecté (persistance)
     final User? currentFirebaseUser = _authService.currentUser;
     if (currentFirebaseUser != null) {
-      print('🔐 Utilisateur persistant trouvé: ${currentFirebaseUser.uid}');
+      debugLog('🔐 Utilisateur persistant trouvé: ${currentFirebaseUser.uid}');
       try {
         _currentUser = await _authService.getUserData(currentFirebaseUser.uid);
-        print('🔐 Données utilisateur récupérées: ${_currentUser?.nom}');
+        debugLog('🔐 Données utilisateur récupérées: ${_currentUser?.nom}');
       } catch (e) {
-        print('❌ Erreur récupération données utilisateur persistant: $e');
+        debugLog('❌ Erreur récupération données utilisateur persistant: $e');
         _errorMessage = 'Erreur lors du chargement des données utilisateur';
       }
     }
@@ -42,18 +43,18 @@ class AuthProvider with ChangeNotifier {
 
     // Écouter les changements d'état d'authentification
     _authService.authStateChanges.listen((User? user) async {
-      print('🔐 Changement état auth: ${user?.uid ?? "null"}');
+      debugLog('🔐 Changement état auth: ${user?.uid ?? "null"}');
       if (user != null) {
         try {
           _currentUser = await _authService.getUserData(user.uid);
-          print('🔐 Utilisateur connecté: ${_currentUser?.nom}');
+          debugLog('🔐 Utilisateur connecté: ${_currentUser?.nom}');
         } catch (e) {
-          print('❌ Erreur chargement données: $e');
+          debugLog('❌ Erreur chargement données: $e');
           _errorMessage = 'Erreur lors du chargement des données utilisateur';
         }
       } else {
         _currentUser = null;
-        print('🔐 Utilisateur déconnecté');
+        debugLog('🔐 Utilisateur déconnecté');
       }
       _isInitializing = false; // S'assurer que c'est marqué comme terminé
       notifyListeners();
@@ -62,7 +63,7 @@ class AuthProvider with ChangeNotifier {
 
   /// Connexion
   Future<bool> signIn(String email, String password) async {
-    print('🔐 AuthProvider.signIn() - Début connexion pour: $email');
+    debugLog('🔐 AuthProvider.signIn() - Début connexion pour: $email');
     _setLoading(true);
     _clearError();
 
@@ -72,15 +73,15 @@ class AuthProvider with ChangeNotifier {
         password: password,
       );
 
-      print('👤 Utilisateur connecté: ${_currentUser?.nom}');
-      print('🔑 Rôle utilisateur: ${_currentUser?.role}');
-      print('👑 Est admin: ${_currentUser?.isAdmin}');
-      print('🎯 IsLoggedIn: $isLoggedIn');
-      print('🎯 IsAdmin: $isAdmin');
+      debugLog('👤 Utilisateur connecté: ${_currentUser?.nom}');
+      debugLog('🔑 Rôle utilisateur: ${_currentUser?.role}');
+      debugLog('👑 Est admin: ${_currentUser?.isAdmin}');
+      debugLog('🎯 IsLoggedIn: $isLoggedIn');
+      debugLog('🎯 IsAdmin: $isAdmin');
 
       return _currentUser != null;
     } catch (e) {
-      print('❌ Erreur connexion: $e');
+      debugLog('❌ Erreur connexion: $e');
       _errorMessage = e.toString();
       return false;
     } finally {

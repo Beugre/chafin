@@ -14,11 +14,14 @@ void main() {
         expect(LoanCalculationService.calculateTauxSelonDuree(4), 10.0);
       });
 
-      test('5 à 8 mensualités → 15%', () {
+      test('5 à 6 mensualités → 15%', () {
         expect(LoanCalculationService.calculateTauxSelonDuree(5), 15.0);
         expect(LoanCalculationService.calculateTauxSelonDuree(6), 15.0);
-        expect(LoanCalculationService.calculateTauxSelonDuree(7), 15.0);
-        expect(LoanCalculationService.calculateTauxSelonDuree(8), 15.0);
+      });
+
+      test('7+ mensualités → 20% (hors plafond 6 mois)', () {
+        expect(LoanCalculationService.calculateTauxSelonDuree(7), 20.0);
+        expect(LoanCalculationService.calculateTauxSelonDuree(8), 20.0);
       });
 
       test('9 mensualités et plus → 20%', () {
@@ -49,8 +52,8 @@ void main() {
         expect(taux, 15.0);
       });
 
-      test('5 à 8 mensualités → 15% (ex: 8 mois)', () {
-        final taux = LoanCalculationService.calculateTauxEffectif(2000, 8);
+      test('5-6 mensualités → 15% (ex: 6 mois)', () {
+        final taux = LoanCalculationService.calculateTauxEffectif(2000, 6);
         expect(taux, 15.0);
       });
 
@@ -62,6 +65,110 @@ void main() {
       test('9+ mensualités → 20% (ex: 12 mois - cas de votre exemple)', () {
         final taux = LoanCalculationService.calculateTauxEffectif(100, 12);
         expect(taux, 20.0);
+      });
+    });
+
+    group('applyRiskMultiplier', () {
+      test('confiance 4-5 (faible risque) → taux / 2', () {
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, 4.0), 5.0);
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, 5.0), 5.0);
+        expect(LoanCalculationService.applyRiskMultiplier(15.0, 4.5), 7.5);
+      });
+
+      test('confiance 2-3 (risque normal) → taux inchangé', () {
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, 2.0), 10.0);
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, 3.0), 10.0);
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, 3.9), 10.0);
+      });
+
+      test('confiance < 2 (gros risque) → taux × 2', () {
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, 1.0), 20.0);
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, 0.5), 20.0);
+        expect(LoanCalculationService.applyRiskMultiplier(5.0, 1.0), 10.0);
+      });
+
+      test('confiance null → taux inchangé', () {
+        expect(LoanCalculationService.applyRiskMultiplier(10.0, null), 10.0);
+      });
+    });
+
+    group('calculateTauxWithRisk', () {
+      test('1 mois, confiance 5 → 5% / 2 = 2.5%', () {
+        expect(LoanCalculationService.calculateTauxWithRisk(1000, 1, 5.0), 2.5);
+      });
+
+      test('4 mois, confiance 3 → 10%', () {
+        expect(
+          LoanCalculationService.calculateTauxWithRisk(1000, 4, 3.0),
+          10.0,
+        );
+      });
+
+      test('6 mois, confiance 1 → 15% × 2 = 30%', () {
+        expect(
+          LoanCalculationService.calculateTauxWithRisk(1000, 6, 1.0),
+          30.0,
+        );
+      });
+
+      test('2 mois, confiance null → 10%', () {
+        expect(
+          LoanCalculationService.calculateTauxWithRisk(500, 2, null),
+          10.0,
+        );
+      });
+    });
+
+    group('calculateInteretsTotaux', () {
+      test('1000€ à 10% → 100€', () {
+        expect(
+          LoanCalculationService.calculateInteretsTotaux(1000, 10, 4),
+          100.0,
+        );
+      });
+
+      test('500€ à 15% → 75€', () {
+        expect(
+          LoanCalculationService.calculateInteretsTotaux(500, 15, 6),
+          75.0,
+        );
+      });
+
+      test('taux 0% → 0€', () {
+        expect(LoanCalculationService.calculateInteretsTotaux(1000, 0, 4), 0.0);
+      });
+    });
+
+    group('calculateMontantTotalARembourser', () {
+      test('1000€ à 10% → 1100€', () {
+        expect(
+          LoanCalculationService.calculateMontantTotalARembourser(1000, 10, 4),
+          1100.0,
+        );
+      });
+
+      test('500€ à 5% → 525€', () {
+        expect(
+          LoanCalculationService.calculateMontantTotalARembourser(500, 5, 1),
+          525.0,
+        );
+      });
+
+      test('taux 0% → capital seul', () {
+        expect(
+          LoanCalculationService.calculateMontantTotalARembourser(1000, 0, 4),
+          1000.0,
+        );
+      });
+    });
+
+    group('calculateCoutTotal', () {
+      test('mensualité 275€ × 4 - 1000€ → 100€ d\'intérêts', () {
+        expect(LoanCalculationService.calculateCoutTotal(275, 4, 1000), 100.0);
+      });
+
+      test('mensualité 1050€ × 1 - 1000€ → 50€ d\'intérêts', () {
+        expect(LoanCalculationService.calculateCoutTotal(1050, 1, 1000), 50.0);
       });
     });
 
@@ -125,13 +232,9 @@ void main() {
             datePremierePaiement: DateTime(2024, 1, 15),
           );
 
-          // TAUX SIMPLE : intérêts constants chaque mois
-          expect(schedule.first.interet, equals(schedule.last.interet));
-          expect(schedule.first.principal, equals(schedule.last.principal));
-
-          // Vérifications des montants
-          expect(schedule.first.interet, equals(16.67)); // 200 / 12
-          expect(schedule.first.principal, equals(83.33)); // 1000 / 12
+          // TAUX SIMPLE : intérêts quasi-constants (sauf dernière pour arrondi)
+          expect(schedule.first.interet, closeTo(16.67, 0.01)); // 200 / 12
+          expect(schedule.first.principal, closeTo(83.33, 0.01)); // 1000 / 12
 
           // La somme des principaux doit égaler le capital
           final totalPrincipal = schedule.fold<double>(
