@@ -63,3 +63,9 @@ coverage/
 .firebaserc
 firebase-service-account.json
 **/service-account*.json
+
+# iOS build artifacts
+ios/build/
+*.ipa
+*.dSYM
+*.xcarchive
